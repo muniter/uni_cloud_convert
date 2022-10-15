@@ -1,5 +1,6 @@
-import pika
 import os
+from celery import Celery
+from database import db_session
 
 import logging
 
@@ -11,30 +12,23 @@ logging.basicConfig(
 logger = logging.getLogger("converter")
 
 # RabbitMQ connection, read from the environment
-RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
-RABBITMQ_USER = os.environ.get("RABBITMQ_DEFAULT_USER")
-RABBITMQ_PASS = os.environ.get("RABBITMQ_DEFAULT_PASS")
-
-# Error if the environment variables are not set
-if not all([RABBITMQ_HOST, RABBITMQ_USER, RABBITMQ_PASS]):
-    logger.error("RabbitMQ environment variables are not set")
-    exit(1)
-
-# Connect to RabbitMQ
-credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
-connection_params = pika.ConnectionParameters(
-    host=RABBITMQ_HOST,
-    credentials=credentials,
-    connection_attempts=5,
-    retry_delay=5,
-)
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
+if not CELERY_BROKER_URL:
+    raise ValueError("Missing CELERY_BROKER_URL environment variable")
 
 
-def on_connected(connection):
-    logger.info("Connected to RabbitMQ")
+app = Celery("cloud_convert", broker=CELERY_BROKER_URL)
 
 
-connection = pika.SelectConnection(connection_params, on_open_callback=on_connected)
+@app.task(name="db_health")
+def db_health():
+    logger.info("Checking database health")
+    db_session.execute("SELECT 1")
+    logger.info("Database health is OK")
+    return "OK"
 
-logger.info("Connecting to RabbitMQ attempt")
-connection.ioloop.start()
+
+@app.task(name="ping")
+def ping(payload):
+    logger.info(f"Got ping: {payload}, here is your pong")
+    return True

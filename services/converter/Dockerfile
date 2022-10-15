@@ -6,6 +6,4 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc
 RUN pip install -r requirements.txt
-# Para hacer debugging interno a la imagen
-# CMD ["tail", "-f", "/dev/null"]
-CMD [ "python", "app.py"]
+CMD [ "celery", "-A", "app", "worker", "--autoscale", "5", "--loglevel=info" ]
