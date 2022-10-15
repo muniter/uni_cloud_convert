@@ -77,9 +77,15 @@ Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
 
 Requerimientos: docker
 
-Para correr el experimento solo es necesario dos pasos.
+### Inicializar
 
 1. En un terminal levantar el experimento: `docker compose up --build`
+
+### Empezar en blanco
+
+Lo siguiente parará (si estan corriendo) los contenedores, los elimina y también elimina los volúmenes.
+
+1. `docker compose down -v`
 
 ### Health Checks
 
@@ -87,11 +93,11 @@ Para confirmar el funcionamiento de las partes de la app:
 
 ```bash
 # Cliente Web (En el response se verá el resultado)
-curl localhost:8080/api-health
+curl localhost:8000/api-health
 # Converter (Revisar los logs para ver el resultado)
-curl localhost:8080/converter-health
+curl localhost:8000/converter-health
 # Ping, pong style (mirar los logs)
-curl localhost:8080/ping
+curl localhost:8000/ping
 ```
 
 <!-- links, leave at the end, this should be invisible -->
