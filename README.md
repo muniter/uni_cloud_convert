@@ -81,9 +81,9 @@ Requerimientos: docker
 
 1. En un terminal levantar el experimento: `docker compose up --build`
 
-### Empezar en blanco
+### Destruir / Tear Down
 
-Lo siguiente parará (si estan corriendo) los contenedores, los elimina y también elimina los volúmenes.
+Lo siguiente parará (si están corriendo) los contenedores, los elimina y también elimina los volúmenes. De tal forma que al levantar de nuevo el aplicativo empieza en blanco.
 
 1. `docker compose down -v`
 
