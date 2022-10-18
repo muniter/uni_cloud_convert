@@ -4,6 +4,7 @@ from flask_restful import Api
 import logging
 import uuid
 import os
+import requests
 from celery import Celery
 
 # Set up the models, create the database tables
@@ -11,7 +12,8 @@ app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 
 
-app.config.update(CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
+app.config.update(
+    CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
 
 def make_celery(app):
@@ -72,6 +74,12 @@ def convert_health():
     return {
         "message": "Sent a task to check the database health, check converter logs"
     }, 200
+
+
+@app.get("/auth")
+def hello_auth():
+    responde = requests.get("http://auth:5000/hello")
+    return responde.json()
 
 
 def create_app():

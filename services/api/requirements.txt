@@ -19,3 +19,4 @@ six==1.16.0
 SQLAlchemy==1.4.41
 Werkzeug==2.2.2
 celery==5.2.7
+requests[security] == 2.9.1 

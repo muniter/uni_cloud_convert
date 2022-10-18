@@ -12,6 +12,7 @@ services:
       - ./assets:/mnt
     env_file: ./.env
     depends_on:
+      - database-auth
       - database
       - rabbit-mq
     networks:
@@ -27,6 +28,22 @@ services:
       - ./assets:/mnt
     env_file: ./.env
     depends_on:
+      - database-auth
+      - database
+      - rabbit-mq
+    networks:
+      - internal
+  
+  auth:
+    container_name: auth
+    build:
+      dockerfile: Dockerfile
+      context: ./services/auth
+    env_file: ./.env
+    ports:
+      - 8001:5000
+    depends_on:
+      - database-auth
       - database
       - rabbit-mq
     networks:
@@ -50,16 +67,30 @@ services:
     restart: always
     # Uses the variables starting with POSTGRES_
     ports:
-      - 5432:5432
+      - 5430:5432
     env_file: ./.env
     volumes:
       - database-data:/var/lib/postgresql/data
+    networks:
+      - internal
+  database-auth:
+    container_name: database-auth
+    image: postgres:15
+    restart: always
+    # Uses the variables starting with POSTGRES_
+    ports:
+      - 5431:5432
+    env_file: ./.env
+    volumes:
+      - database-auth:/var/lib/postgresql/auth
     networks:
       - internal
 
 volumes:
   rabbit-mq-data:
   database-data:
+  database-auth:
+  
 
 networks:
   internal:
