@@ -1,5 +1,6 @@
+from urllib import response
 from database import db_session, init_db
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_restful import Api
 import logging
 import uuid
@@ -76,10 +77,30 @@ def convert_health():
     }, 200
 
 
-@app.get("/auth")
+@app.get("/auth-health")
 def hello_auth():
-    responde = requests.get("http://auth:5000/hello")
-    return responde.json()
+    response = requests.get("http://auth:5000/hello")
+    return response.json()
+
+
+@app.post("/signup")
+def signup():
+    data = request.get_json()
+    response = requests.post("http://auth:5000/signup", json=data)
+    return response.json()
+
+
+@app.get("/users")
+def users():
+    response = requests.get("http://auth:5000/signup")
+    return response.json()
+
+
+@app.post("/login")
+def login():
+    data = request.get_json()
+    response = requests.post("http://auth:5000/login", json=data)
+    return response.json()
 
 
 def create_app():
