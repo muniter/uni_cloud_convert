@@ -4,6 +4,7 @@ COPY requirements.txt ./
 # Postgres client dependencies
 RUN apt-get update && apt-get install -y \
     libpq-dev \
-    gcc
+    gcc \
+    ffmpeg
 RUN pip install -r requirements.txt
 CMD [ "celery", "-A", "app", "worker", "--autoscale", "5", "--loglevel=info" ]
