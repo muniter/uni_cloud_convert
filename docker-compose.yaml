@@ -32,20 +32,6 @@ services:
     networks:
       - internal
   
-  auth:
-    container_name: auth
-    build:
-      dockerfile: Dockerfile
-      context: ./services/auth
-    env_file: ./.env
-    ports:
-      - 8001:5000
-    depends_on:
-      - database
-      - rabbit-mq
-    networks:
-      - internal
-
   rabbit-mq:
     image: rabbitmq:3-management
     container_name: rabbit-mq
@@ -70,12 +56,11 @@ services:
       - database-data:/var/lib/postgresql/data
     networks:
       - internal
-  
 
 volumes:
   rabbit-mq-data:
   database-data:
-  
+
 
 networks:
   internal:
