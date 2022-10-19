@@ -2,7 +2,7 @@ import os
 from pydub import AudioSegment
 from celery import Celery
 from email_service import send_notification
-#from database import db_session
+from database import db_session
 
 import logging
 
@@ -21,7 +21,7 @@ if not CELERY_BROKER_URL:
 
 
 app = Celery("cloud_convert", broker=CELERY_BROKER_URL)
-'''
+
 
 @app.task(name="db_health")
 def db_health():
@@ -35,7 +35,7 @@ def db_health():
 def ping(payload):
     logger.info(f"Got ping: {payload}, here is your pong")
     return True
-'''
+
 
 def make_conversion(original_filename, expected_format):
     without_extension = original_filename[0 : original_filename.rfind('.')]
