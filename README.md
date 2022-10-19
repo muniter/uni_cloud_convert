@@ -17,8 +17,6 @@ Validar la autenticación de la plataforma, garantiza la confidencialidad y evit
 
 La siguiente es la arquitectura de la aplicación
 
-TODO: Falta mostrar conexión convertidor-email
-
 ```mermaid
 flowchart TD
   subgraph Cliente
@@ -37,13 +35,30 @@ flowchart TD
   end
 ```
 
-| Componente     | Propósito |
-|----------------|-----------|
-| Cliente        |           |
-| API            |           |
-| Converter      |           |
-| Message Broker |           |
-| Database       |           |
+### Componentes
+
+A nivel de infraestructura
+
+| Componente     | Propósito                                                            |
+|----------------|----------------------------------------------------------------------|
+| Cliente        | Consume el servicio de conversión.                                   |
+| API            | Autentica, y despacha los servicios.                                 |
+| Converter      | Recibe solicitudes de conversión                                     |
+| Message Broker | Cola de mensajería, por donde se despachan solicitudes de conversión |
+| Database       | Persistencia de usuarios, tasks, metadata de conversiones            |
+
+
+### Tecnológica
+
+Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
+
+1. Postgres: motor de base de datos realcional.
+2. Flask: web framework.
+3. Rabbit MQ: cola de mensajería
+3. Celery: framework que utiliza a Rabbit para implementar un job queue.
+4. SqlAlchemy: ORM para la comunicación.
+5. uvicorn: HTTP <-> ASGI bridge para la comunicación del Flask.
+6. ffmpeg: convertidor de formatos de audio.
 
 
 ### Ejemplo de conversión
@@ -55,6 +70,9 @@ sequenceDiagram
   participant mb as Message Broker
   participant db as Database
   participant co as Converter
+
+  Note over cli,co: El usuario ya está autenticado
+
   cli->>api: Solicitud de conversión
   api->>db: Crear record de conversión
   api->>mb: Encola conversión
@@ -64,17 +82,6 @@ sequenceDiagram
   co->>db: Reporta resultado de conversión
   co-->cli: Email al cliente con link de descarga
 ```
-
-## Descripción Tecnológica
-
-Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
-
-1. Postgres:
-2. Flask:
-3. Rabbit MQ:
-3. Celery:
-4. SqlAlchemy:
-
 
 ## Instrucciones
 
@@ -102,6 +109,14 @@ curl localhost:8000/converter-health
 # Ping, pong style (mirar los logs)
 curl localhost:8000/ping
 ```
+
+## Análisis de Capacidad
+
+TODO: Iniciar planeación
+
+### Limitaciones
+
+TODO: Cuales son las limitaciones del desarrollo
 
 <!-- links, leave at the end, this should be invisible -->
 [@RonaldLugo]: https://github.com/RonaldLugo
