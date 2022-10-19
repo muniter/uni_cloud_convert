@@ -56,7 +56,7 @@ services:
       - database-data:/var/lib/postgresql/data
     networks:
       - internal
-
+    
 volumes:
   rabbit-mq-data:
   database-data:
