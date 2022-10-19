@@ -17,6 +17,8 @@ Validar la autenticación de la plataforma, garantiza la confidencialidad y evit
 
 La siguiente es la arquitectura de la aplicación
 
+TODO: Falta mostrar conexión convertidor-email
+
 ```mermaid
 flowchart TD
   subgraph Cliente
@@ -55,9 +57,10 @@ sequenceDiagram
   participant co as Converter
   cli->>api: Solicitud de conversión
   api->>db: Crear record de conversión
-  api->>db: Encola conversión
+  api->>mb: Encola conversión
   api->>cli: Notifica conversión iniciada
   co-->mb: Desencola conversión
+  co-->co: Realiza conversión
   co->>db: Reporta resultado de conversión
   co-->cli: Email al cliente con link de descarga
 ```
