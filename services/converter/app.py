@@ -44,13 +44,16 @@ def make_conversion(original_filename, expected_format, receiver):
     src = mnt_dir + original_filename
     dst = mnt_dir + without_extension + '.' + expected_format
 
-    # convert wav to mp3                                   
+    # convert wav to mp3                  
+    logger.info("iniciando conversion")                 
     sound = AudioSegment.from_file(src)
     sound.export(dst)
+    logger.info("finalizada conversion")                 
     
+    #ToDo if no es test
     send_notification(original_filename, expected_format, receiver)
     #ToDo actualizar status en db
 
-make_conversion("transcript.mp3", "wav")
+make_conversion("transcript.mp3", "wav", "asantamariap14@gmail.com")
 
 
