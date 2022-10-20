@@ -37,18 +37,19 @@ def ping(payload):
     return True
 
 
-def make_conversion(original_filename, expected_format):
+@app.task(name="convert")
+def make_conversion(original_filename, expected_format, receiver):
     without_extension = original_filename[0 : original_filename.rfind('.')]
 
     src = mnt_dir + original_filename
     dst = mnt_dir + without_extension + '.' + expected_format
 
-    # convert wav to mp3                                                            
+    # convert wav to mp3                                   
     sound = AudioSegment.from_file(src)
     sound.export(dst)
     
-    #ToDo obtener datos de la db
-    send_notification(original_filename, expected_format, "asantamariap14@gmail.com")
+    send_notification(original_filename, expected_format, receiver)
+    #ToDo actualizar status en db
 
 make_conversion("transcript.mp3", "wav")
 
