@@ -38,7 +38,7 @@ def ping(payload):
 
 
 @app.task(name="convert")
-def make_conversion(original_filename, expected_format, receiver):
+def make_conversion(db_id, original_filename, expected_format, receiver):
     without_extension = original_filename[0 : original_filename.rfind('.')]
 
     src = mnt_dir + original_filename
@@ -54,6 +54,6 @@ def make_conversion(original_filename, expected_format, receiver):
     send_notification(original_filename, expected_format, receiver)
     #ToDo actualizar status en db
 
-make_conversion("transcript.mp3", "wav", "asantamariap14@gmail.com")
+#make_conversion("transcript.mp3", "wav", "asantamariap14@gmail.com")
 
 
