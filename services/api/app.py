@@ -17,8 +17,6 @@ app.config.update(
     CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
 # Setup auth routes
-import auth
-
 
 def make_celery(app):
 
@@ -80,4 +78,6 @@ def convert_health():
     }, 200
 
 def create_app():
+    import auth
+    import tasks
     return app
