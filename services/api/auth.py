@@ -31,6 +31,11 @@ def create_user(username, email, password):
     user = User(username=username, email=email, password=password)
     db_session.add(user)
     db_session.commit()
+    return user
+
+
+def access_token(id, username):
+    return create_access_token(identity={"id": id, "username": username})
 
 
 @app.route("/api/auth/signup", methods=["POST"])
@@ -42,12 +47,15 @@ def signup(body: UserRegistationBody):
     if user_exists(body.username):
         return {"message": "Username already exists"}, 400
     else:
-        create_user(
+        user = create_user(
             username=body.username,
             email=body.email,
             password=body.password1,
         )
-        return {"message": "User created successfully"}, 201
+        return {
+            "message": "User created successfully",
+            "access_token": access_token(user.id, user.username),
+        }, 201
 
 
 @app.route("/api/users", methods=["GET"])
@@ -72,7 +80,6 @@ def get_users():
 def login(body: LoginBody):
     user = db_session.query(User).filter_by(username=body.username).first()
     if user and user.password == body.password:
-        token = create_access_token(identity={"id": user.id, "username": body.username})
-        return {"access_token": token}, 200
+        return {"access_token": access_token(user.id, user.username)}, 200
 
     return {"message": "Invalid credentials"}, 401
