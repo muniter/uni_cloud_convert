@@ -8,11 +8,14 @@ import os
 import requests
 from celery import Celery
 
+UPLOAD_FOLDER = '/mnt/uploaded_files'
+
 # Set up the models, create the database tables
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config.update(
     CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
