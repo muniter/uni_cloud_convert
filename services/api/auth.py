@@ -1,11 +1,16 @@
+import re
 from flask import request
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from flask_jwt_extended import create_access_token, JWTManager
 from database import db_session
 from app import app
 from models import User
 from pydantic import BaseModel
 from flask_pydantic import validate
+
+PASSWORD_MIN_LEN = 5
+PASSWORD_MAX_LEN = 20
+PASSWORD_REQUIRED_SPECIAL_CHARS = "[$#@]"
 
 jwt = JWTManager(app)
 
@@ -22,9 +27,30 @@ class LoginBody(BaseModel):
     password: str
 
 
-def user_exists(username):
-    query = select(User).where(User.username == username)
-    return db_session.execute(query).one_or_none() is not None
+def user_exists(username, email):
+    query = select(User).where(or_(User.username == username, User.email == email))
+    return db_session.execute(query).first() is not None
+
+
+def valid_password(password):
+    valid = False
+    while not valid:  
+        if (len(password)<PASSWORD_MIN_LEN or len(password)>PASSWORD_MAX_LEN):
+            break
+        elif not re.search("[a-z]",password):
+            break
+        elif not re.search("[0-9]",password):
+            break
+        elif not re.search("[A-Z]",password):
+            break
+        elif not re.search(PASSWORD_REQUIRED_SPECIAL_CHARS,password):
+            break
+        elif re.search("\s",password):
+            break
+        else:
+            valid=True
+            break
+    return valid
 
 
 def create_user(username, email, password):
@@ -41,11 +67,16 @@ def access_token(id, username):
 @app.route("/api/auth/signup", methods=["POST"])
 @validate()
 def signup(body: UserRegistationBody):
-    # If passwords don't match return error
+    if user_exists(body.username, body.email):
+        return {"message": "Username or email already exists"}, 400
     if body.password1 != body.password2:
         return {"message": "Passwords don't match"}, 400
-    if user_exists(body.username):
-        return {"message": "Username already exists"}, 400
+    if not valid_password(body.password1) :
+        message = "Password does not meet the minimum security conditions. "\
+                  "It must have between {} and {} characters, at least one lowercase, "\
+                  "one uppercase, one number, one character {} and no whitespace"\
+                  .format(PASSWORD_MIN_LEN, PASSWORD_MAX_LEN, PASSWORD_REQUIRED_SPECIAL_CHARS)
+        return {"message": message}, 400
     else:
         user = create_user(
             username=body.username,
