@@ -1,6 +1,8 @@
+import os
 from sqlalchemy import select, and_
 from database import db_session
 from app import app
+from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Task
 from flask_pydantic import validate
@@ -93,7 +95,19 @@ def get_file(task_id: str):
 @jwt_required()
 def create_task():
     user_id = get_jwt_identity()["id"]
-    raise NotImplementedError
+    if 'fileName' not in request.files:
+        return {"message": "file not sent"}, 400
+    file = request.files['fileName']
+    new_format = request.form['newFormat']
+    if file.filename == '':
+        return {"message": "file null"}, 400
+    if not file:
+        return {"message": "corrupted file"}, 400
+        
+    file_upload_name = "uploaded.{}".format(file.filename.rsplit('.', 1)[1].lower())
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_upload_name))
+    app.logger.info("uploaded file {} as {} to convert to {}".format(file.filename, file_upload_name, new_format))
+    return {"message": "uploaded file {} as {} to convert to {}".format(file.filename, file_upload_name, new_format)}, 200
 
 
 # Endpoint to update a task, for changing the format
