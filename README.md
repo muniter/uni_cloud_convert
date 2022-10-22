@@ -89,6 +89,13 @@ Requerimientos: docker
 
 ### Inicializar
 
+Si corre en una máquina virtual primero debe descargar docker.
+
+```bash
+# Ubuntu
+sudo apt install docker
+```
+
 1. En un terminal levantar el experimento: `docker compose up --build`
 
 ### Destruir / Tear Down
@@ -110,9 +117,21 @@ curl localhost:8000/converter-health
 curl localhost:8000/ping
 ```
 
-## Análisis de Capacidad
+# Plan de pruebas
 
-TODO: Iniciar planeación
+Para definir el plan necesitamos:
+
+1. Establecer tiempo de una conversión cuando el sistema esta idle
+2. Definir el tiempo de servicio aceptable para un archivo de peso de 1 mega.
+
+Pruebas:
+
+1. Número de conversiones en paralelos para un tiempo de respuesta aceptable (Throughput and Response Time).
+1. Tiempo de conversión de archivo en estado idle.
+1. Número de conversiones para que los health-check del sistema empiecen a fallar (Throughput).
+
+# Análisis de Capacidad
+
 
 ### Limitaciones
 
