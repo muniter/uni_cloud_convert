@@ -1,0 +1,22 @@
+config:
+  target: "http://localhost:8000"
+  processor: "processor.js"
+  timeout: 20
+  phases:
+    - name: warmup
+      duration: 60
+      arrivalRate: 1 #rps
+    - name: 5 rps
+      duration: 60
+      arrivalRate: 5 #rps
+    - name: 10 rps
+      duration: 60
+      arrivalRate: 10 #rps
+  defaults:
+    headers:
+      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU"
+scenarios:
+  - flow:
+      - post:
+          url: "/api/tasks"
+          beforeRequest: "setupMultipartFormData"
