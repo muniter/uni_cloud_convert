@@ -8,18 +8,16 @@ import os
 import requests
 from celery import Celery
 
-UPLOAD_FOLDER = '/mnt/uploaded_files'
-
 # Set up the models, create the database tables
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config.update(
-    CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
+app.config["UPLOAD_FOLDER"] = "/mnt/uploaded_files"
+app.config.update(CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
 # Setup auth routes
+
 
 def make_celery(app):
 
@@ -47,7 +45,11 @@ def shutdown_session(exception=None):
 
 @app.before_first_request
 def init():
-    # remove the file and create a new one
+    # Set up the upload folder
+    UPLOAD_FOLDER = app.config["UPLOAD_FOLDER"]
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.mkdir(UPLOAD_FOLDER)
+
     app.logger.info("Got the first request, initializing the database")
     init_db()
     app.logger.info("Database initialized")
@@ -80,7 +82,9 @@ def convert_health():
         "message": "Sent a task to check the database health, check converter logs"
     }, 200
 
+
 def create_app():
     import auth
     import tasks
+
     return app
