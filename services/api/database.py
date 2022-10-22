@@ -38,6 +38,7 @@ def init_db():
     # Look for user with id=1
     user = models.User.query.filter_by(id=1).one_or_none()
     if not user:
-        user = models.User(username="admin", email="admin@admin.com", password="admin")
+        email = os.environ.get("EMAIL_USER", "admin@admin.com")
+        user = models.User(username="admin", email=email, password="admin")
         db_session.add(user)
         db_session.commit()
