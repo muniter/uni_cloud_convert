@@ -1,13 +1,32 @@
 import os
 from sqlalchemy import select, and_
 from database import db_session
+from datetime import datetime
 from app import app
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Task
+from models import Task, User
 from flask_pydantic import validate
 from werkzeug.utils import secure_filename
+from celery import Celery
 
+NEW_FORMAT_VALID = {"mp3", "acc", "ogg", "wav", "wma"}
+CONVERT_FOLDER = '/mnt/converted_files'
+
+def make_celery(app):
+
+    celery = Celery("cloud_convert")
+    celery.conf.update(app.config["CELERY_CONFIG"])
+
+    class ContextTask(celery.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+    return celery
+
+celery = make_celery(app)
 
 def task_serialize(task):
     return {
@@ -105,7 +124,7 @@ def create_task():
         return {"message": "file not sent"}, 400
     
     file = request.files['fileName']
-    new_format = request.form['newFormat']
+    new_format = request.form['newFormat'].lower()
     
     if file.filename == '':
         return {"message": "file null"}, 400
@@ -116,9 +135,11 @@ def create_task():
     file_upload_name = secure_filename(file.filename)
     file_upload_path = os.path.join(app.config['UPLOAD_FOLDER'], file_upload_name)
     
-    
     if os.path.exists(file_upload_path):
         return {"message": "file exits"}, 403
+      
+    if new_format is None or not new_format or new_format not in NEW_FORMAT_VALID:
+      return {"message": "newFormat value not valid in {}".format(NEW_FORMAT_VALID)}, 400
     
     file.save(file_upload_path)
     file_size = os.stat(file_upload_path).st_size
@@ -131,6 +152,15 @@ def create_task():
                     original_size=file_size)
     db_session.add(new_task)
     db_session.commit()
+    
+    user = (
+        db_session.execute(
+            select([User]).where(and_(User.id == user_id))
+        )
+        .scalars()
+        .one_or_none()
+    ) 
+    
     task = (
         db_session.execute(
             select([Task]).where(and_(Task.id == new_task.id, Task.user_id == user_id))
@@ -138,6 +168,9 @@ def create_task():
         .scalars()
         .one_or_none()
     ) 
+    
+    app.logger.info("Sending task to convert")
+    celery.send_task("convert", args=[task.id, file_upload_name, new_format, user.email])
     
     message = "uploaded file '{}' as '{}' to convert to '{}'".format(file.filename, file_upload_name, new_format)
     app.logger.info(message)
@@ -149,4 +182,49 @@ def create_task():
 @jwt_required()
 def update_task(task_id: int):
     user_id = get_jwt_identity()["id"]
-    raise NotImplementedError
+    new_format = request.json.get("newFormat", None).lower()
+    
+    user = (
+        db_session.execute(
+            select([User]).where(and_(User.id == user_id))
+        )
+        .scalars()
+        .one_or_none()
+    ) 
+    
+    task = (
+        db_session.execute(
+            select([Task]).where(Task.id == task_id)
+        )
+        .scalars()
+        .one_or_none()
+    )
+    
+    if not task:
+      return {"message": "task not found"}, 404
+    
+    if new_format is None or not new_format or new_format not in NEW_FORMAT_VALID:
+      return {"message": "newFormat value not valid in {}".format(NEW_FORMAT_VALID)}, 400
+        
+    if task.processed_file:
+      app.logger.info("hay archivo procesado anteriormente")
+      prev = os.path.join(CONVERT_FOLDER, task.processed_file)
+      if os.path.exists(prev):
+        app.logger.info("si existe, eliminar")
+        os.remove(prev)
+        
+    task.timestamp = datetime.utcnow() 
+    task.status = "uploaded"
+    task.user_id = user_id 
+    task.new_format = new_format 
+    task.processed_file = None 
+    task.processed_format = None 
+    task.processed_size = None 
+    task.processed_at = None 
+    
+    db_session.commit()
+    
+    app.logger.info("Sending task to convert")
+    celery.send_task("convert", args=[task.id, task.uploaded_filename, new_format, user.email])
+    
+    return {"message": "task updated", "task": task_serialize(task)}, 200

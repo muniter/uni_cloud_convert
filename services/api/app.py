@@ -79,6 +79,7 @@ def convert_health():
     return {
         "message": "Sent a task to check the database health, check converter logs"
     }, 200
+    
 
 def create_app():
     import auth
