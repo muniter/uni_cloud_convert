@@ -33,4 +33,11 @@ Base.query = db_session.query_property()
 
 def init_db():
     import models
+
     Base.metadata.create_all(bind=engine)
+    # Look for user with id=1
+    user = models.User.query.filter_by(id=1).one_or_none()
+    if not user:
+        user = models.User(username="admin", email="admin@admin.com", password="admin")
+        db_session.add(user)
+        db_session.commit()
