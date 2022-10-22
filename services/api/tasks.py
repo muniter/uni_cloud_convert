@@ -114,6 +114,9 @@ def create_db_task(file, user_id, new_format) -> tuple[Task, User]:
     file.save(file_upload_path)
     file_size = os.stat(file_upload_path).st_size
 
+    if file_size == 0:
+        raise Exception("File is empty")
+
     new_task = Task(
         user_id=user_id,
         new_format=new_format,
