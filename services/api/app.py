@@ -1,7 +1,5 @@
-from urllib import response
 from database import db_session, init_db
 from flask import Flask, request, jsonify
-from flask_restful import Api
 import logging
 import uuid
 import os
@@ -14,6 +12,8 @@ app.logger.setLevel(logging.INFO)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 app.config["UPLOAD_FOLDER"] = "/mnt/uploaded_files"
+app.config["CONVERTED_FOLDER"] = "/mnt/converted_files"
+app.config["ALLOWED_FORMATS"] = {"mp3", "acc", "ogg", "wav", "wma"}
 app.config.update(CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
 # Setup auth routes
@@ -34,8 +34,6 @@ def make_celery(app):
 
 
 celery = make_celery(app)
-api = Api(app)
-
 
 # Teardown the database session
 @app.teardown_appcontext
