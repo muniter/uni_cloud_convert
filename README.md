@@ -96,7 +96,7 @@ Si corre en una máquina virtual primero debe descargar docker.
 sudo apt install docker
 ```
 
-1. En un terminal levantar el experimento: `docker compose up --build`
+1. En un terminal levantar la aplicación: `docker compose up --build`
 
 ### Destruir / Tear Down
 
@@ -124,18 +124,29 @@ Para definir el plan necesitamos:
 1. Establecer tiempo de una conversión cuando el sistema esta idle
 2. Definir el tiempo de servicio aceptable para un archivo de peso de 1 mega.
 
-Pruebas:
+## Escenarios
 
-1. Número de conversiones en paralelos para un tiempo de respuesta aceptable (Throughput and Response Time).
-1. Tiempo de conversión de archivo en estado idle.
-1. Número de conversiones para que los health-check del sistema empiecen a fallar (Throughput).
+1. Máxima cantidad de request/minuto que soporta la aplicación con usuario concurrentes.
+
+Limitantes:
+
+- Archivo de tamaño mínimo de 5MB
+- Tiempo de conversión (desde la solicitud hasta que el convertidor lo procesa) máximo de 10 minutos.
+
+2. Máxima cantidad de archivos procesables por minuto.
+
+Limitantes:
+
+- Archivo de tamaño mínimo de 5MB
+- Tiempo de respuesta máximo de 1.5 segundos
+- Porcentaje de error máximo del 1%
 
 # Análisis de Capacidad
 
 
 ### Limitaciones
 
-TODO: Cuales son las limitaciones del desarrollo
+TODO: 
 
 <!-- links, leave at the end, this should be invisible -->
 [@RonaldLugo]: https://github.com/RonaldLugo
