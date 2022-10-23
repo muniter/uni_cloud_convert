@@ -1,11 +1,12 @@
 import os
-import pathlib
+from pathlib import Path
+import json
 import uuid
 from sqlalchemy import select, and_
 from database import db_session
 from datetime import datetime
 from app import app
-from flask import request, send_file
+from flask import request, send_file, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Task, User
 from pydantic import BaseModel
@@ -105,9 +106,9 @@ def get_file(file_id: str):
     return send_file(file_path, as_attachment=True)
 
 
-def create_db_task(file, user_id, new_format) -> tuple[Task, User]:
+def create_db_task(file, user_id, new_format, commit=True) -> tuple[Task, User]:
     file_id = str(uuid.uuid4())
-    file_extension = pathlib.Path(file.filename).suffix.lstrip(".")
+    file_extension = Path(file.filename).suffix.lstrip(".")
     file_upload_name = f"{file_id}.{file_extension}"
     file_upload_path = os.path.join(app.config["UPLOAD_FOLDER"], file_upload_name)
 
@@ -126,19 +127,12 @@ def create_db_task(file, user_id, new_format) -> tuple[Task, User]:
         original_format=file_extension,
         original_size=file_size,
     )
-    db_session.add(new_task)
-    db_session.commit()
+    if commit:
+        db_session.add(new_task)
+        db_session.commit()
 
     user = (
         db_session.execute(select([User]).where(and_(User.id == user_id)))
-        .scalars()
-        .one_or_none()
-    )
-
-    task = (
-        db_session.execute(
-            select([Task]).where(and_(Task.id == new_task.id, Task.user_id == user_id))
-        )
         .scalars()
         .one_or_none()
     )
@@ -148,7 +142,7 @@ def create_db_task(file, user_id, new_format) -> tuple[Task, User]:
     if user is None:
         raise Exception("User not found")
 
-    return task, user
+    return new_task, user
 
 
 # Endpoint to create a new task
@@ -249,3 +243,66 @@ def update_task(task_id: int, body: TaskUpdateBody):
     )
 
     return {"message": "task updated", "task": task_serialize(task)}, 200
+
+
+@app.route("/benchmark/conversion/start", methods=["POST"])
+@jwt_required()
+def benchmark_conversion():
+    user_id = get_jwt_identity()["id"]
+    user_email = (
+        db_session.execute(select([User.email]).where(User.id == user_id))
+        .scalars()
+        .one_or_none()
+    )
+    tasks: list[Task] = []
+
+    if user_email is None:
+        return {"message": "User not found"}, 404
+
+    if "fileName" not in request.files:
+        return {"message": "file not sent"}, 400
+
+    file = request.files["fileName"]
+    new_format = request.form["newFormat"].lower()
+    task_number = int(request.form["taskNumber"])
+
+    if not file.filename:
+        return {"message": "file null"}, 400
+    if not file:
+        return {"message": "corrupted file"}, 400
+
+    if new_format not in app.config["ALLOWED_FORMATS"]:
+        return {"message": "newFormat value is not an allowed format"}, 400
+
+    if not task_number:
+        return {"message": "taskNumber value is not an allowed format"}, 400
+
+    for i in range(task_number):
+        file.seek(0)
+        app.logger.info(f"Creating task {i}")
+        task, _ = create_db_task(file, user_id, new_format, commit=False)
+        tasks.append(task)
+
+    now = datetime.utcnow()
+    for task in tasks:
+        task.uploaded_at = now  # pyright: ignore
+
+    db_session.add_all(tasks)
+    db_session.commit()
+
+    app.logger.info(f"Sending {task_number} task to conversion queue")
+    for task in tasks:
+        celery.send_task(
+            "convert",
+            args=[
+                task.file_id,
+                task.uploaded_filename,
+                task.new_format,
+                user_email,
+            ],
+        )
+    app.logger.info(f"Tasks {task_number} sent to conversion queue")
+
+    return {
+        "message": f"Starting benchmark with {task_number} tasks",
+    }, 200
