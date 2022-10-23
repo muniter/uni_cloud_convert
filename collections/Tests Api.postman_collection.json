@@ -1,0 +1,188 @@
+{
+	"info": {
+		"_postman_id": "f87e4d0a-5a40-49d4-a368-683fd1e35cf9",
+		"name": "Tests Api",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17517406"
+	},
+	"item": [
+		{
+			"name": "/api/auth/signup",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password1\": \"Us3r$1\",\r\n    \"password2\": \"Us3r$1\",\r\n    \"email\": \"user1@example.com\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/auth/signup",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"signup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/api/auth/login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password\": \"Us3r$1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/auth/login",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/api/tasks - upload file",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileName",
+							"type": "file",
+							"src": "AORGQ_Utz/file example MP3 1MG.mp3"
+						},
+						{
+							"key": "newFormat",
+							"value": "WAV",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/api/tasks - get tasks",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjM5NjIwMCwianRpIjoiMDE3ZGVhOWQtNDBlNi00ODk3LWJiYzgtYjMxOTU5NjY0NzJiIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MTAsInVzZXJuYW1lIjoidXNlcjEifSwibmJmIjoxNjY2Mzk2MjAwfQ.ecx1fkrjyMBqVvrlPNx9ZVGkvkCn1_J1bgkqdTX1OkU",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/tasks",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/api/tasks - get task by id",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjM5NjIwMCwianRpIjoiMDE3ZGVhOWQtNDBlNi00ODk3LWJiYzgtYjMxOTU5NjY0NzJiIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MTAsInVzZXJuYW1lIjoidXNlcjEifSwibmJmIjoxNjY2Mzk2MjAwfQ.ecx1fkrjyMBqVvrlPNx9ZVGkvkCn1_J1bgkqdTX1OkU",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/tasks/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/api/tasks - update task",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"newFormat\": \"OGG\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks/5",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks",
+						"5"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
