@@ -1,7 +1,0 @@
-.venv/
-.git
-__pycache__/*
-*.pyc
-*.sql
-*.sqlite
-*.db

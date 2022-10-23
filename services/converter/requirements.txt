@@ -1,4 +1,0 @@
-celery==5.2.7
-SQLAlchemy==1.4.41
-psycopg2==2.9.4
-pydub==0.25.1
