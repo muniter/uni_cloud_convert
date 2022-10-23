@@ -1,0 +1,313 @@
+{
+	"info": {
+		"_postman_id": "f87e4d0a-5a40-49d4-a368-683fd1e35cf9",
+		"name": "Api",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1 - Signup - /api/auth/signup",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password1\": \"Us3r$1\",\r\n    \"password2\": \"Us3r$1\",\r\n    \"email\": \"user1@example.com\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/auth/signup",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"signup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2 - Login - /api/auth/login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password\": \"Us3r$1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/auth/login",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3 - Get all tasks - /api/tasks",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4 - Create task - /api/tasks",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileName",
+							"type": "file",
+							"src": "AORGQ_Utz/file example MP3 1MG.mp3"
+						},
+						{
+							"key": "newFormat",
+							"value": "WAV",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5 - Get task - /api/tasks/<id>",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks/8",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks",
+						"8"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6 - Change format - /api/tasks/<id>",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"newFormat\": \"OGG\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks/6",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "7 - Delete task - /api/tasks/<id>",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "{{host}}/api/tasks/6",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"tasks",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "8 - Download file - /api/files/<filename>",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjQwNjE1MSwianRpIjoiZTliMDdlNjItZjU5NS00MWFkLTljNDctMjVlNWRjMTI3OTk4IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJ1c2VyMSJ9LCJuYmYiOjE2NjY0MDYxNTF9.LVkGxEooQroEhjLUroeEW5SNzRUW8-HMZqVIutzmNWU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "{{host}}/api/files/9ea4dab0-00aa-4d26-acbf-b9a3267a61bc",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"files",
+						"9ea4dab0-00aa-4d26-acbf-b9a3267a61bc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "9 - Ping",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/ping",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"ping"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "10 - Converter health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/converter-health",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"converter-health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "11 - API health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/api-health",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api-health"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
