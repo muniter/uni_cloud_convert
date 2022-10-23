@@ -286,13 +286,17 @@ curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=400 http://IP_DE_MAQ
 
 3. Esperar 10 minutos, para poder observar cuantas tareas se pudieron completar.
 
-4. Obtener estadísticas de todos las tareas
+4. Obtener datos de procesamiento de todos las tareas para luego ser procesadas:
+
+> Nota: **require el comando jq para procesar el json**
 
 ```bash
-curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result
+curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result | jq -r 'sort_by(.id) |  .[] | [.id, .uploaded_at, .processed_at] | @csv' > /tmp/stats.csv
 ```
 
 5. Generar reportes
+
+TODO
 
 ### Limitaciones
 
