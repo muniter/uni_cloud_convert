@@ -21,7 +21,7 @@ class TaskUpdateBody(BaseModel):
 def task_serialize(task):
     return {
         "id": task.id,
-        "timestamp": task.timestamp,
+        "timestamp": task.timestamp.isoformat() if task.timestamp else None,
         "status": task.status,
         "user_id": task.user_id,
         "new_format": task.new_format,
@@ -32,8 +32,8 @@ def task_serialize(task):
         "processed_file": task.processed_file,
         "processed_format": task.processed_format,
         "processed_size": task.processed_size,
-        "uploaded_at": task.uploaded_at,
-        "processed_at": task.processed_at,
+        "uploaded_at": task.uploaded_at.isoformat() if task.uploaded_at else None,
+        "processed_at": task.processed_at.isoformat() if task.processed_at else None,
     }
 
 
