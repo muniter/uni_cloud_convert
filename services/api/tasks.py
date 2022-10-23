@@ -49,6 +49,12 @@ def get_tasks():
     return [task_serialize(task) for task in tasks], 200
 
 
+@app.route("/benchmark/conversion/result", methods=["GET"])
+def benchmark_conversion_result():
+    tasks = db_session.execute(select([Task])).scalars().all()
+    return [task_serialize(task) for task in tasks], 200
+
+
 @app.route("/api/tasks/<int:task_id>", methods=["GET"])
 @jwt_required()
 @validate()
@@ -246,9 +252,8 @@ def update_task(task_id: int, body: TaskUpdateBody):
 
 
 @app.route("/benchmark/conversion/start", methods=["POST"])
-@jwt_required()
 def benchmark_conversion():
-    user_id = get_jwt_identity()["id"]
+    user_id = 1
     user_email = (
         db_session.execute(select([User.email]).where(User.id == user_id))
         .scalars()
