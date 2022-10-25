@@ -518,7 +518,7 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
   curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result | jq -r 'sort_by(.id) |  .[] | [.id, .uploaded_at, .processed_at] | @csv' > ./stats.csv
   ```
 
-5. Un ejemplo del reporte es el siguiente:[reporte escenario 2][@res-scenario-2]
+5. Un ejemplo del reporte es el siguiente:[html](https://muniter.github.io/uni_cloud_convert/local_scenario_2), [pdf](https://github.com/muniter/uni_cloud_convert/wiki/Entrega-1---pdfs)
 
 ### Limitaciones
 
