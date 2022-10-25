@@ -225,6 +225,8 @@ sudo docker exec -it <<containerid>> bash
   - Reemplazar \<id\> con \<\<TASK ID\>\>
 - Repetir pasos 3 y 5 para confirmar la eliminación de la tarea
 
+<div style="page-break-after: always; visibility: hidden"> 
+</div>
 
 # Análisis de Capacidad
 
