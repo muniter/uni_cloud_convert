@@ -453,9 +453,11 @@ Tiempo promedio de procesamiento por archivo: 15 segs
 ![image](https://user-images.githubusercontent.com/98927955/197672468-7909d05d-18a6-4fe9-aa23-314934e35721.png)
 
 Resultado general:
+
 ![image](https://user-images.githubusercontent.com/98927955/197673642-7bbf09cc-b43e-4572-b82c-286561241f2f.png)
 
 Resultado particular:
+
 ![image](https://user-images.githubusercontent.com/98927955/197673795-b7670ba0-b29e-4a1a-869c-fbd8090a1ac9.png)
 
 
@@ -527,8 +529,10 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
 ### Conclusiones
 - El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
 - La capacidad de almacenamiento es un factor muy relevante en el funcionamiento del servicio ya que se almacena cada archivo cargado en su versión original y en su versión convertida. Para proyectar un escalamiento a cientos de usuarios finales se recomienda considerar lo siguiente:
-  - Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
-  - Separar el almacenamiento de los componentes de docker al almacenamiento de archivos de audio, de tal manera que la indisponibilidad de capacidad de almacenamiento de archivos, no afecte el funcionamiento del componente del servicio
+- Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
+- Separar el almacenamiento de los componentes de docker al almacenamiento de archivos de audio, de tal manera que la indisponibilidad de capacidad de almacenamiento de archivos, no afecte el funcionamiento del componente del servicio
+- El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
+- Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
 
 
 <!-- links, leave at the end, this should be invisible -->
