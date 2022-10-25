@@ -209,16 +209,19 @@ sudo docker exec -it <<containerid>> bash
   - Reemplazar \<id\> con \<\<TASK ID\>\>
   - Verificar estado de la tarea en *processed*
   - Verificar recepción de correo de notificación - identificar archivo de descarga \<\<FILENAME\>\>
-    - Reemplazar localhost con la \<\<IP MAQUINA VIRTUAL APP\>\>
+    - Reemplazar en el link *localhost* con la \<\<IP MAQUINA VIRTUAL APP\>\>
 - 8 - Download file - /api/files/\<filename\>
+  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
   - Reemplazar \<\<FILENAME\>\>
   - Confirmar descarga del archivo convertido
 - 6 - Change format - /api/tasks/\<id\>
+  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
   - Reemplazar \<id\> con \<\<TASK ID\>\>
   - Ingresar newFormat con el formato deseado
 - Repetir pasos 3 y 5 para confirmar la actualización de la tarea y el estado *processed*
   - Verificar recepción de correo de notificación
 - 7 - Delete task - /api/tasks/\<id\>
+  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
   - Reemplazar \<id\> con \<\<TASK ID\>\>
 - Repetir pasos 3 y 5 para confirmar la eliminación de la tarea
 

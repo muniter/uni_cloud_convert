@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Didact+Gothic&display=swap" rel="stylesheet">
+  <!-- <script type="module" src="./report.js"></script> -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:,">  
+  <title>MISO - Desarrollo de software en la nube - Análisis de capacidad</title>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <section id="header" class="col text-bg-dark p-3">
+        
+        <h1>MISO - Desarrollo de software en la nube</h1>
+        <h2>Análisis de capacidad</h2>
+      </section>
+      <section id="integrantes" class="col text-bg-secondary p-3">
+        <h3>Integrantes</h3>
+        <ul class="list-inline">
+          <li class="list-inline-item mx-4">Ronald Lugo</li>
+          <li class="list-inline-item mx-4">Javier Lopez</li>
+          <li class="list-inline-item mx-4">Alejandro Santamaría</li>
+          <li class="list-inline-item mx-4">Hector Tenezaca</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+  <div class="container-fluid text-bg-light">
+    <section id="content" class="p-3">
+      <p>Total: <span id="total">0</span></p>
+      <div class="chart-container" style="position: relative; height:30vh; width:80vw">
+        <canvas id="myChart"></canvas>
+      </div>
+    </section>
+  </div>
+    
+  <script src="report.js"></script>
+</body>
+</html>

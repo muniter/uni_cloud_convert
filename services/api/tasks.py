@@ -6,7 +6,7 @@ from sqlalchemy import select, and_
 from database import db_session
 from datetime import datetime
 from app import app
-from flask import request, send_file, Response
+from flask import request, send_file, Response, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Task, User
 from pydantic import BaseModel
@@ -36,6 +36,11 @@ def task_serialize(task):
         "processed_at": task.processed_at.isoformat() if task.processed_at else None,
     }
 
+def data_serialize(row):
+  return {
+    "min": int(row.min),
+    "count": int(row.count)
+  }
 
 @app.route("/api/tasks", methods=["GET"])
 @jwt_required()
@@ -53,6 +58,16 @@ def get_tasks():
 def benchmark_conversion_result():
     tasks = db_session.execute(select([Task])).scalars().all()
     return [task_serialize(task) for task in tasks], 200
+  
+
+@app.route("/benchmark/conversion/data", methods=["GET"])
+def benchmark_conversion_data():
+    data = db_session.execute("select d.diff as min, count(d.id) from (select id, ceil(extract(epoch from (processed_at - uploaded_at)) / 60) as diff from tasks where processed_at is not null) as d group by d.diff order by min")
+    response = jsonify([data_serialize(row) for row in data])
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+    
+    """ return [data_serialize(row) for row in data], 200 """
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["GET"])
