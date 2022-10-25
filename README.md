@@ -409,7 +409,7 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un arhcivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (400).
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (400).
 - El api genera los artefactos en base de datos y file system para las 400 tareas.
 - El api encola las 400 tareas rápidamente
 - El convertidor desencola y convierte
@@ -433,15 +433,50 @@ sequenceDiagram
 
 #### Resultados
 
-Durante la prueba
-TODO
+**Estado del sistema**
 
-| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT   | MEM %  | NET I/O         | BLOCK I/O       | PIDS |
-|--------------|-----------|---------|---------------------|--------|-----------------|-----------------|------|
-| a9175656333b | converter | 195.87% | 552.5MiB / 1.929GiB | 27.96% | 275kB / 215kB   | 1.37GB / 6.05GB | 21   |
-| f6a612bd4356 | api       | 0.01%   | 113.4MiB / 1.929GiB | 5.74%  | 6.73MB / 2.12MB | 6.62MB / 10.6GB | 3    |
-| 035190f11926 | rabbit-mq | 0.15%   | 110.1MiB / 1.929GiB | 5.57%  | 958kB / 262kB   | 29.2MB / 25.2MB | 26   |
-| 8568d6723a11 | database  | 0.01%   | 56.19MiB / 1.929GiB | 2.84%  | 1.43MB / 3.48MB | 52.4MB / 117MB  | 14   |
+Docker stats
+
+| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT  | MEM %  | NET I/O       | BLOCK I/O       | PIDS |
+|--------------|-----------|---------|--------------------|--------|---------------|-----------------|------|
+| de76416b2310 | converter | 273.11% | 470.9MiB / 1.93GiB | 23.83% | 309kB / 251kB | 1.37GB / 6.05GB | 21   |
+| a088a7065d76 | api       | 0.05%   | 113.1MiB / 1.93GiB | 5.72%  | 5.9MB / 879MB | 6.62MB / 10.6GB | 3    |
+| bd8dce77cacf | rabbit-mq | 0.72%   | 104.9MiB / 1.93GiB | 5.31%  | 501kB / 277kB | 29.2MB / 25.2MB | 26   |
+| cf3c71fa7a20 | database  | 0.33%   | 48.67MiB / 1.93GiB | 2.46%  | 613MB / 606MB | 52.4MB / 117MB  | 14   |
+
+Top
+
+![image](https://user-images.githubusercontent.com/98927955/197672368-27761580-02f4-4cfc-969b-db1947dc1d6b.png)
+
+Tiempo promedio de procesamiento por archivo: 15 segs
+
+![image](https://user-images.githubusercontent.com/98927955/197672468-7909d05d-18a6-4fe9-aa23-314934e35721.png)
+
+Resultado general:
+
+![image](https://user-images.githubusercontent.com/98927955/197673642-7bbf09cc-b43e-4572-b82c-286561241f2f.png)
+
+Resultado particular:
+
+![image](https://user-images.githubusercontent.com/98927955/197673795-b7670ba0-b29e-4a1a-869c-fbd8090a1ac9.png)
+
+
+Los resultados más relevantes son: 
+- Comportamiento de componentes son:
+  - El componente **converter** tiene el mayor consumo de cpu y memoria, producto de la conversión de archivos realizada
+  - El componente **rabbit-mq** no genera un alto consumo de recursos para gestionar la distribución de carga de las 400 peticiones encoladas
+  - El componente **database** no genera alto consumo de recursos a pesar que cada procesamiento es actualizado en el sistema
+  - El componente **api** genera alto consumo de I/O para el paso de archivos, pero su carga baja durante la fase de procesamiento
+  - El comportamiento del procesamiento fue consistente en cuanto a tiempos, en promedio cada conversión tardó alrededor de 15 segundos
+- Procesamiento para 400 solicitudes simultáneas:
+  - Cantidad de archivos procesados en menos de 10 min: 193
+  - Cantidad de archivos procesados en más de 10 min: 207
+  - La cantidad mínima de archivos procesados por minuto fueron: 15
+  - La cantidad máxima de archivos procesados por minuto fueron: 20
+  - La tendencia del sistema fue procesar hasta 20 archivos por minuto con leves intermitencias
+  - El tiempo que tardó el sistema en procesar las 400 solicitudes fue de 21 minutos
+
+**Archivos procesados por minuto: 20**
 
 #### Instrucciones
 
@@ -468,9 +503,14 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
     curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=400 http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/start
     ```
 
-3. Esperar 10 minutos, para poder observar cuantas tareas se pudieron completar.
+3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
+    ```bash
+    http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/data
+    ```
 
-4. Obtener datos de procesamiento de todos las tareas para luego ser procesadas:
+4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
+
+4. Obtener datos de procesamiento de todos las tareas para luego ser analizadas en detalle:
 
 > Nota: **require el comando jq para procesar el json**
 
@@ -478,9 +518,7 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
   curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result | jq -r 'sort_by(.id) |  .[] | [.id, .uploaded_at, .processed_at] | @csv' > ./stats.csv
   ```
 
-5. Generar reportes
-
-TODO
+5. Un ejemplo del reporte es el siguiente:[html](https://muniter.github.io/uni_cloud_convert/local_scenario_2), [pdf](https://github.com/muniter/uni_cloud_convert/wiki/Entrega-1---pdfs)
 
 ### Limitaciones
 
@@ -491,8 +529,10 @@ TODO
 ### Conclusiones
 - El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
 - La capacidad de almacenamiento es un factor muy relevante en el funcionamiento del servicio ya que se almacena cada archivo cargado en su versión original y en su versión convertida. Para proyectar un escalamiento a cientos de usuarios finales se recomienda considerar lo siguiente:
-  - Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
-  - Separar el almacenamiento de los componentes de docker al almacenamiento de archivos de audio, de tal manera que la indisponibilidad de capacidad de almacenamiento de archivos, no afecte el funcionamiento del componente del servicio
+- Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
+- Separar el almacenamiento de los componentes de docker al almacenamiento de archivos de audio, de tal manera que la indisponibilidad de capacidad de almacenamiento de archivos, no afecte el funcionamiento del componente del servicio
+- El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
+- Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
 
 
 <!-- links, leave at the end, this should be invisible -->

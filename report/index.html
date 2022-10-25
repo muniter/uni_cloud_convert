@@ -20,7 +20,6 @@
   <div class="container-fluid">
     <div class="row">
       <section id="header" class="col text-bg-dark p-3">
-        
         <h1>MISO - Desarrollo de software en la nube</h1>
         <h2>Análisis de capacidad</h2>
       </section>
@@ -37,7 +36,12 @@
   </div>
   <div class="container-fluid text-bg-light">
     <section id="content" class="p-3">
-      <p>Total: <span id="total">0</span></p>
+      <div class="container-fluid">
+        <div class="row">
+          <p class="col">Total: <span id="total">0</span></p>
+          <p class="col">Eje x: cantidad de archivos procesados, Eje y: minutos</p>
+        </div>
+      </div>
       <div class="chart-container" style="position: relative; height:30vh; width:80vw">
         <canvas id="myChart"></canvas>
       </div>
