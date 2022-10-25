@@ -444,8 +444,37 @@ Docker stats
 | bd8dce77cacf | rabbit-mq | 0.72%   | 104.9MiB / 1.93GiB | 5.31%  | 501kB / 277kB | 29.2MB / 25.2MB | 26   |
 | cf3c71fa7a20 | database  | 0.33%   | 48.67MiB / 1.93GiB | 2.46%  | 613MB / 606MB | 52.4MB / 117MB  | 14   |
 
+Top
+
+![image](https://user-images.githubusercontent.com/98927955/197672368-27761580-02f4-4cfc-969b-db1947dc1d6b.png)
+
+Tiempo promedio de procesamiento por archivo: 15 segs
+
+![image](https://user-images.githubusercontent.com/98927955/197672468-7909d05d-18a6-4fe9-aa23-314934e35721.png)
+
+Resultado general:
+![image](https://user-images.githubusercontent.com/98927955/197673642-7bbf09cc-b43e-4572-b82c-286561241f2f.png)
+
+Resultado particular:
+![image](https://user-images.githubusercontent.com/98927955/197673795-b7670ba0-b29e-4a1a-869c-fbd8090a1ac9.png)
 
 
+Los resultados más relevantes son: 
+- Comportamiento de componentes son:
+  - El componente **converter** tiene el mayor consumo de cpu y memoria, producto de la conversión de archivos realizada
+  - El componente **rabbit-mq** no genera un alto consumo de recursos para gestionar la distribución de carga de las 400 peticiones encoladas
+  - El componente **database** no genera alto consumo de recursos a pesar que cada procesamiento es actualizado en el sistema
+  - El componente **api** genera alto consumo de I/O para el paso de archivos, pero su carga baja durante la fase de procesamiento
+  - El comportamiento del procesamiento fue consistente en cuanto a tiempos, en promedio cada conversión tardó alrededor de 15 segundos
+- Procesamiento para 400 solicitudes simultáneas:
+  - Cantidad de archivos procesados en menos de 10 min: 193
+  - Cantidad de archivos procesados en más de 10 min: 207
+  - La cantidad mínima de archivos procesados por minuto fueron: 15
+  - La cantidad máxima de archivos procesados por minuto fueron: 20
+  - La tendencia del sistema fue procesar hasta 20 archivos por minuto con leves intermitencias
+  - El tiempo que tardó el sistema en procesar las 400 solicitudes fue de 21 minutos
+
+**Archivos procesados por minuto: 20**
 
 #### Instrucciones
 
@@ -472,9 +501,14 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
     curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=400 http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/start
     ```
 
-3. Esperar 10 minutos, para poder observar cuantas tareas se pudieron completar.
+3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
+    ```bash
+    http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/data
+    ```
 
-4. Obtener datos de procesamiento de todos las tareas para luego ser procesadas:
+4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
+
+4. Obtener datos de procesamiento de todos las tareas para luego ser analizadas en detalle:
 
 > Nota: **require el comando jq para procesar el json**
 
@@ -482,9 +516,7 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
   curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result | jq -r 'sort_by(.id) |  .[] | [.id, .uploaded_at, .processed_at] | @csv' > ./stats.csv
   ```
 
-5. Generar reportes
-
-TODO
+5. Un ejemplo del reporte es el siguiente:[reporte escenario 2][@res-scenario-2]
 
 ### Limitaciones
 
