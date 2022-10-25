@@ -409,7 +409,7 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un arhcivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (400).
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (400).
 - El api genera los artefactos en base de datos y file system para las 400 tareas.
 - El api encola las 400 tareas rápidamente
 - El convertidor desencola y convierte
@@ -433,15 +433,19 @@ sequenceDiagram
 
 #### Resultados
 
-Durante la prueba
-TODO
+**Estado del sistema**
 
-| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT   | MEM %  | NET I/O         | BLOCK I/O       | PIDS |
-|--------------|-----------|---------|---------------------|--------|-----------------|-----------------|------|
-| a9175656333b | converter | 195.87% | 552.5MiB / 1.929GiB | 27.96% | 275kB / 215kB   | 1.37GB / 6.05GB | 21   |
-| f6a612bd4356 | api       | 0.01%   | 113.4MiB / 1.929GiB | 5.74%  | 6.73MB / 2.12MB | 6.62MB / 10.6GB | 3    |
-| 035190f11926 | rabbit-mq | 0.15%   | 110.1MiB / 1.929GiB | 5.57%  | 958kB / 262kB   | 29.2MB / 25.2MB | 26   |
-| 8568d6723a11 | database  | 0.01%   | 56.19MiB / 1.929GiB | 2.84%  | 1.43MB / 3.48MB | 52.4MB / 117MB  | 14   |
+Docker stats
+
+| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT  | MEM %  | NET I/O       | BLOCK I/O       | PIDS |
+|--------------|-----------|---------|--------------------|--------|---------------|-----------------|------|
+| de76416b2310 | converter | 273.11% | 470.9MiB / 1.93GiB | 23.83% | 309kB / 251kB | 1.37GB / 6.05GB | 21   |
+| a088a7065d76 | api       | 0.05%   | 113.1MiB / 1.93GiB | 5.72%  | 5.9MB / 879MB | 6.62MB / 10.6GB | 3    |
+| bd8dce77cacf | rabbit-mq | 0.72%   | 104.9MiB / 1.93GiB | 5.31%  | 501kB / 277kB | 29.2MB / 25.2MB | 26   |
+| cf3c71fa7a20 | database  | 0.33%   | 48.67MiB / 1.93GiB | 2.46%  | 613MB / 606MB | 52.4MB / 117MB  | 14   |
+
+
+
 
 #### Instrucciones
 
