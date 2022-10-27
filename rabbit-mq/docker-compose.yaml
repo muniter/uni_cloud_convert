@@ -10,6 +10,7 @@ services:
         - 5672:5672
     volumes:
       - ./rabbit-mq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    env_file: ../.env
     networks:
       - internal
     
