@@ -1,0 +1,21 @@
+version: '3.7'
+services:
+  
+  rabbit-mq:
+    image: rabbitmq:3-management
+    container_name: rabbit-mq
+    ports:
+        # Management port
+        - 80:15672
+        - 5672:5672
+    volumes:
+      - ./rabbit-mq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    env_file: ../.env
+    networks:
+      - internal
+    
+volumes:
+  rabbit-mq-data:
+
+networks:
+  internal:

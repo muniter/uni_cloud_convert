@@ -6,14 +6,13 @@ services:
       dockerfile: Dockerfile
       context: ./services/api
     ports:
-      - 8000:5000
+      - 80:5000
     volumes:
       - ./services/api:/usr/src/app
       - ./assets:/mnt
     env_file: ./.env
     depends_on:
       - database
-      - rabbit-mq
     networks:
       - internal
 
@@ -28,19 +27,6 @@ services:
     env_file: ./.env
     depends_on:
       - database
-      - rabbit-mq
-    networks:
-      - internal
-  
-  rabbit-mq:
-    image: rabbitmq:3-management
-    container_name: rabbit-mq
-    ports:
-        # Management port
-        - 15672:15672
-    env_file: ./.env
-    volumes:
-      - ./rabbit-mq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     networks:
       - internal
 
@@ -58,7 +44,6 @@ services:
       - internal
     
 volumes:
-  rabbit-mq-data:
   database-data:
 
 
