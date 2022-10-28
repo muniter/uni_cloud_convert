@@ -543,3 +543,40 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
 [@htenezaca]: https://github.com/htenezaca
 [@muniter]: https://github.com/muniter
 [@res-scenario-1]: https://muniter.github.io/uni_cloud_convert/local_scenario_1
+
+
+# Pasos
+
+1. Instalar paquetes necesarios
+
+```bash
+sudo apt update && sudo apt install docker docker-compose nfs-common git
+```
+
+1. Configurar permisos para docker
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+1. Cerrar sesión y conectarse de nuevo para que tome los nuevos permisos.
+
+Verificar que todo funciona con el comando:
+
+```bash
+docker ps
+```
+
+1. Clonar el repositorio
+
+```bash
+git clone https://github.com/muniter/uni_cloud_convert.git
+```
+
+1. Cambiar a la carpeta esperada
+
+1. Levantar servicio con el script
+
+```bash
+sudo ./startup.py
+```

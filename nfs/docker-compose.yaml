@@ -1,0 +1,14 @@
+version: '3.7'
+services:
+  nfs:
+    container_name: nfs
+    image: itsthenetwork/nfs-server-alpine:12
+    privileged: true
+    ports:
+      - "2049:2049"
+    environment:
+      SHARED_DIRECTORY: /assets
+    volumes:
+      - ./assets:/assets
+    entrypoint: /usr/bin/nfsd.sh
+    restart: always

@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  api:
+    container_name: api
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - 80:5000
+    volumes:
+      - ./:/usr/src/app
+      - ./assets:/mnt
+    network_mode: host
+    env_file: ./.env
+    restart: always
