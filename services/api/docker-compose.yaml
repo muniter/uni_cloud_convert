@@ -10,6 +10,5 @@ services:
     volumes:
       - ./:/usr/src/app
       - ./assets:/mnt
-    network_mode: host
     env_file: ./.env
     restart: always
