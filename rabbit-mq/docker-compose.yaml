@@ -5,17 +5,12 @@ services:
     image: rabbitmq:3-management
     container_name: rabbit-mq
     ports:
-        # Management port
         - 80:15672
         - 5672:5672
     volumes:
-      - ./rabbit-mq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     env_file: ../.env
-    networks:
-      - internal
-    
+    restart: always
+
 volumes:
   rabbit-mq-data:
-
-networks:
-  internal:

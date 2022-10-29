@@ -1,0 +1,13 @@
+version: '3.7'
+services:
+  converter:
+    container_name: converter
+    build:
+      dockerfile: Dockerfile
+      context: .
+    volumes:
+      - ./:/usr/src/app
+      - ./assets:/mnt
+    env_file: ./.env
+    restart: always
+
