@@ -1,5 +1,5 @@
 import os
-import pathlib
+from pathlib import Path
 from pydub import AudioSegment
 from celery import Celery
 from email_service import send_notification
@@ -15,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger("converter")
 mnt_dir = "/mnt"
 # Setup dst_dir
-dst_dir = pathlib.Path(mnt_dir) / "converted_files"
+dst_dir = Path(mnt_dir) / "converted_files"
 if not dst_dir.exists():
     dst_dir.mkdir()
 
@@ -64,14 +64,20 @@ def mark_conversion(file_id, processed_file, processed_format, processed_size):
     db_session.commit()
 
 
-@app.task(name="convert")
-def make_conversion(file_id, filename, expected_format, email):
+@app.task(name="convert", bind=True)
+def make_conversion(self, file_id, filename, expected_format, email):
     logger.info(f"Converting {filename} to {expected_format}")
-    without_extension = pathlib.Path(filename).stem
+    without_extension = Path(filename).stem
 
-    src = pathlib.Path(mnt_dir) / "uploaded_files" / filename
+    src = Path(mnt_dir, "uploaded_files", filename)
+    # Since file is in a nfs mount let's check for existence first
+    if not src.exists():
+        # Retry the task in 5 seconds
+        self.retry(
+            countdown=5, max_retries=5, exc=FileNotFoundError(f"{src} not found")
+        )
     processed_name = f"{without_extension}.{expected_format}"
-    dst = dst_dir / processed_name
+    dst = Path(dst_dir, processed_name)
 
     # convert wav to mp3
     sound = AudioSegment.from_file(src)
