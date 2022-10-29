@@ -73,7 +73,8 @@ def make_conversion(self, file_id, filename, expected_format, email):
     # Since file is in a nfs mount let's check for existence first
     if not src.exists():
         # Retry the task in 5 seconds
-        self.retry(
+        logger.error(f"File {filename} not found, task will be retried")
+        return self.retry(
             countdown=5, max_retries=5, exc=FileNotFoundError(f"{src} not found")
         )
     processed_name = f"{without_extension}.{expected_format}"
