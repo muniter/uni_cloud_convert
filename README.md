@@ -580,3 +580,7 @@ git clone https://github.com/muniter/uni_cloud_convert.git
 ```bash
 sudo ./startup.py
 ```
+
+## Hallazgos Cloud
+
+El convertidor por defecto estaba usando 5 workers, lo que resultó demasiado para los recursos de la máquina, por lo cual tocó retornar a la configuración por defecto de celery que es 1 woker/cpu.

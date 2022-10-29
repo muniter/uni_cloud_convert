@@ -7,4 +7,4 @@ RUN apt-get update && apt-get install -y \
     gcc \
     ffmpeg
 RUN pip install -r requirements.txt
-CMD [ "celery", "-A", "app", "worker", "--autoscale", "5", "--loglevel=info" ]
+CMD [ "celery", "-A", "app", "worker", "--loglevel=info" ]
