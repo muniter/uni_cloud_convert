@@ -15,7 +15,13 @@ Desarrollar un servicio de conversión entre diferentes formatos de audio y pone
 
 ## Arquitectura
 
+Versión: **máquinas virtuales en GCP**
+
 La siguiente es la arquitectura de la aplicación
+
+Convención del diagrama:  
+**CE**: Google Cloud Compute engine  
+**SQL**: Google Cloud SQL  
 
 ```mermaid
 flowchart TD
@@ -24,12 +30,15 @@ flowchart TD
   end
   web<-->api
   subgraph Servicios
-    api[API]
-    mb[Message Broker - Rabbit]
-    db[Database]
+    api[API - CE]
+    co[Converter - CE]
+    mb[Message Broker Rabbit - CE]
+    db[Database - SQL]
+    nfs[NFS Server - CE]
     api<-->mb
+    api<-->nfs
     api-->db
-    co[Converter]
+    co<-->nfs
     mb<-->co
     co-->db
   end
@@ -44,6 +53,7 @@ A nivel de infraestructura
 | Cliente        | Consume el servicio de conversión.                                   |
 | API            | Autentica, y despacha los servicios.                                 |
 | Converter      | Recibe solicitudes de conversión                                     |
+| NFS Server     | Provee carpeta común para transferir archivos entre converter y api  |
 | Message Broker | Cola de mensajería, por donde se despachan solicitudes de conversión |
 | Database       | Persistencia de usuarios, tasks, metadata de conversiones            |
 
@@ -53,13 +63,14 @@ Nota: el alcance actual no incluye el desarrollo del cliente web, por lo cual en
 
 Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
 
-1. Postgres: motor de base de datos realcional.
+1. Postgres: motor de base de datos relacional.
 2. Flask: web framework.
 3. Rabbit MQ: cola de mensajería
 3. Celery: framework que utiliza a Rabbit para implementar un job queue.
 4. SqlAlchemy: ORM para la comunicación.
 5. uvicorn: HTTP <-> ASGI bridge para la comunicación del Flask.
 6. ffmpeg: convertidor de formatos de audio.
+7. nfs: network file system, transfiere archivos en la red.
 
 ### Ejemplo de conversión
 
@@ -67,6 +78,7 @@ Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
 sequenceDiagram
   participant cli as Cliente Web
   participant api as API
+  participant nfs as NFS
   participant mb as Message Broker
   participant db as Database
   participant co as Converter
@@ -75,10 +87,13 @@ sequenceDiagram
 
   cli->>api: Solicitud de conversión
   api->>db: Crear record de conversión
+  api->>nfs: Almacena archivo
   api->>mb: Encola conversión
   api->>cli: Notifica conversión iniciada
   mb-->>co: Solicitud de conversión
+  co->>nfs: Retira archivo
   co->>co: Realiza conversión
+  co->>nfs: Almacena archivo convertido
   co->>db: Reporta resultado de conversión
   co-->>cli: Email al cliente con link de descarga
 ```
@@ -411,9 +426,9 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (400).
-- El api genera los artefactos en base de datos y file system para las 400 tareas.
-- El api encola las 400 tareas rápidamente
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (200).
+- El api genera los artefactos en base de datos y file system para las 200 tareas.
+- El api encola las 200 tareas rápidamente
 - El convertidor desencola y convierte
 
 > Vista **simplificada del proceso**: aunque no estén dibujados en el diagrama todo está operando en conjunto, se encola, se guarda en db y el convertidor trabaja.
@@ -425,10 +440,10 @@ sequenceDiagram
   participant mb as Message Broker
   participant co as Converter
 
-  ben->>api: Solicita generar 400 conversiones
-  api->>api: Genera 400 conversiones
-  api->>mb: Encola 400 conversiones
-  api->>ben: Avisa que inició 400 conversiones
+  ben->>api: Solicita generar 200 conversiones
+  api->>api: Genera 200 conversiones
+  api->>mb: Encola 200 conversiones
+  api->>ben: Avisa que inició 200 conversiones
   mb-->>co: Solicitud de conversión
   co->>co: Conversión
 ```
