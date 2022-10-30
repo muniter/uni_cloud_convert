@@ -86,8 +86,8 @@ sequenceDiagram
   Note over cli,co: El usuario ya está autenticado
 
   cli->>api: Solicitud de conversión
-  api->>db: Crear record de conversión
   api->>nfs: Almacena archivo
+  api->>db: Crear record de conversión
   api->>mb: Encola conversión
   api->>cli: Notifica conversión iniciada
   mb-->>co: Solicitud de conversión
