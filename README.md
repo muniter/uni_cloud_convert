@@ -665,6 +665,7 @@ sudo ./startup.py
 | Máximo de archivos procesados por minuto                   | 20                   | 7                |
 | Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              |
 | Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              |
+| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               |
 | Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos |
 
 - La reducción de capacidad de workers de 5 a 1 en GCP redujo significativamente el desempeño de conversión
