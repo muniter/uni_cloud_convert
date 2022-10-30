@@ -109,13 +109,19 @@ sequenceDiagram
 | `/api/tasks/<int:id_task>`    | PUT    | Actualiza una tarea de conversión existente    | <ul><li>Header Authorization: Bearer Token</li><li>newFormat</li></ul>                  | <ul><li>id_task: id de tarea existente</li><li>Formatos permitidos: "mp3", "acc", "ogg", "wav", "wma"</li></ul>                                                                                                                               |
 | `/api/tasks/<int:task_id>`    | DELETE | Elimina una tarea de conversión existente      | <ul><li>Header Authorization: Bearer Token</li></ul>                                    | <ul><li>id_task: id de tarea existente</li></ul>                                                                                                                                                                                              |
 | `/api/files/<string:file_id>` | GET    | Descarga de archivo                            | <ul><li>Header Authorization: Bearer Token</li></ul>                                    | <ul><li>id_task: id de tarea existente</li></ul>                                                                                                                                                                                              |
+| `/benchmark/conversion/start` | POST   | Lanzamiento masivo concurrente de conversión   | <ul><li>fileName</li><li>newFormat</li><li>taskNumber</li></ul>  | <ul><li>Formatos permitidos: "mp3", "acc", "ogg", "wav", "wma"</li></ul>                                                                                                                                      |
+| `/benchmark/conversion/result`| GET    | Obtiene las tareas con su estado |   |                                                                                                                                                                            |
+| `/benchmark/conversion/data`  | GET    | Obtiene cantidad de tareas procesadas por minuto |   |                                                                                                                                                                            |
 
 Información adicional en documentación del API en Postman en el siguiente link: [documentación API](https://documenter.getpostman.com/view/23989156/2s84LF4Gow), también puede usar [el archivo JSON que describe la API](./collections/Api.postman_collection.json)
-- Configurar environment con las siguientes variables:
+- Configurar environment local con las siguientes variables:
   - protocol: http
   - host: \<\<IP_MAQUINA_VIRTUAL_APP\>\>:8000
+- Configurar environment GCP con las siguientes variables:
+  - protocol: http
+  - host: \<\<IP_MAQUINA_GCP_API\>\>
 
-## Instrucciones Generales de despliegue
+## Instrucciones Generales de despliegue local
 
 ### Inicializar máquina virtual
 
@@ -195,10 +201,28 @@ sudo docker container ls
 sudo docker exec -it <<containerid>> bash
 ```
 
+## Instrucciones Generales de despliegue GCP
+### Iniciar máquinas Google Cloud Compute engine 
+- nfs
+- rabbitmq
+- api
+- converter
+
+### Verificar disponibilidad de base de datos en Cloud SQL
+- database-gcp
+  ```bash
+  # activar Cloud SQL Admin API: 
+  gcloud services enable sqladmin.googleapis.com
+  # esperar unos minutos a que se despliegue el cambio en los sistemas
+  # configurar ip privada
+  ```
+
 ### Prueba del servicio
+*En GCP realizar los pasos en cada CE api y converter en las rutas /service/api y /service/converter respectivamente*
+
 - Habilitar envío de notificación por correo electrónico
   ```bash
-  # uni_cloud_convert / .env 
+  # uni_cloud_convert / .env (en GCP configurar en CE converter)
   STRESS_TEST=0
   ```
 - Reiniciar contenedores desde cero
@@ -247,7 +271,9 @@ sudo docker exec -it <<containerid>> bash
 
 Se realizan pruebas de carga y estrés a la aplicación para lograr dimensionar la capacidad de la misma en un entorno de infraestructura definido. A continuación se describen las pruebas realizadas, los análisis de los resultados y las conclusiones sobre el rendimiento de la aplicación
 
-## Inicializar máquina virtual de prueba
+## Inicializar máquina virtual 
+
+### máquina de prueba local
 
 Requerimientos:
 - Máquina virtual de despliegue
@@ -267,6 +293,16 @@ Requerimientos:
   - Nombre de servidor: testsunicloudconvert
   - username: userlinux
   - password: \<\<PASS\>\>
+
+### Máquina virtual de prueba en GCP
+- Compute Engine
+  - Nombre: test
+  - Tipo de máquina: e2-small
+  - Vcpu: 2
+  - Ram: 2 Gb
+  - SO: Ubuntu
+
+## Complementar en máquina de prueba
 - Configuraciones post
   - Instalar utilidades de red
     - ```sudo apt install net-tools```
@@ -277,7 +313,7 @@ Requerimientos:
 
 ## Preámbulo
 
-### Hallazgos en instalación de Máquinas virtuales
+### Hallazgos en instalación de Máquinas virtuales locales
 
 El proceso de preparación de máquinas virtuales para despliegue y pruebas permitió identificar la configuración predeterminada plasmada. A continuación se comparten los hallazgos más relevantes, los cuales motivaron la definición de parámetros sugeridos:
 
@@ -344,12 +380,12 @@ sequenceDiagram
 
 Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) para inicializar en al parte superior del documento.
 
-- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert
+- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert (CE converter en GCP)
     ```bash
     # uni_cloud_convert / .env 
     STRESS_TEST=1
     ```
-- Reiniciar contenedores desde cero en appunicloudconvert
+- Reiniciar contenedores desde cero en appunicloudconvert (ce y converter en GCP)
     ```bash
     sudo docker compose down -v && sudo rm -rf ./assets/*
     ```
@@ -357,13 +393,14 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
   ```bash
   sudo docker compose up
   ```
-1. Instalar locust en máquina virtual testsunicloudconvert:
+1. Instalar locust en máquina virtual testsunicloudconvert (test en GCP):
     ```bash
     pip install locust
     ```
 
 2. Obtener **IP de la máquina virtual donde esta corriendo la aplicación.** (máquina virtual appunicloudconvert)
     ```bash
+    # comando en máquina local
     ifconfig
     ``` 
 
@@ -374,16 +411,18 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
 
 3. Copiar archivo locustfile.py y sample.mp3 del repositorio y ubicarlos en el directorio desde donde se ejecutará locust
 
-4. Iniciar locust en testsunicloudconvert
+4. Iniciar locust en testsunicloudconvert (test en GCP)
 
     ```bash
-    # NOTA: reemplazar por la IP_DE_MAQUINA_VIRTUAL_APP
+    # máquina local: reemplazar por la IP_DE_MAQUINA_VIRTUAL_APP. 
     locust --host=http://IP_DE_MAQUINA_VIRTUAL_APP:8000 --users=400 --spawn-rate=2 --autostart
+    # máquina test en gcp
+    locust --host=http://api:80 --users=400 --spawn-rate=2 --web-port=80 --autostart
     ```
 
-4. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST:8089` para ver la interfaz de locust podrá ver tab de **estadisticas, gráficas e instrucciones**.
+4. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST:8089` en máquina local, o, `http://IP_PUBLICA_GCP_TEST:80` en GCP, para ver la interfaz de locust podrá ver tab de **estadisticas, gráficas e instrucciones**.
 
-#### Resultados
+#### Resultados en máquina local
 
 El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-1]
 
@@ -448,7 +487,7 @@ sequenceDiagram
   co->>co: Conversión
 ```
 
-#### Resultados
+#### Resultados en máquina local
 
 **Estado del sistema**
 
@@ -499,12 +538,12 @@ Los resultados más relevantes son:
 
 Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) para inicializar en al parte superior del documento.
 
-- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert
+- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert (converter en GCP)
     ```bash
     # uni_cloud_convert / .env 
     STRESS_TEST=1
     ```
-- Reiniciar contenedores desde cero
+- Reiniciar contenedores desde cero (api y converter en GCP)
     ```bash
     sudo docker compose down -v && sudo rm -rf ./assets/*
     ```
@@ -517,12 +556,18 @@ Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) 
 2. Enviar request para iniciar benchmark:
 
     ```bash
+    # en máquina local
     curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=400 http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/start
+    # en máquina test de GCP
+    curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=200 http://api:80/benchmark/conversion/start
     ```
 
 3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
     ```bash
+    # url desde máquina local
     http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/data
+    # url desde máquina test en GCP
+    http://IP_API_GCP:80/benchmark/conversion/data
     ```
 
 4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
@@ -598,4 +643,32 @@ sudo ./startup.py
 
 ## Hallazgos Cloud
 
-El convertidor por defecto estaba usando 5 workers, lo que resultó demasiado para los recursos de la máquina, por lo cual tocó retornar a la configuración por defecto de celery que es 1 woker/cpu.
+- El convertidor por defecto estaba usando 5 workers, lo que resultó demasiado para los recursos de la máquina, por lo cual tocó retornar a la configuración por defecto de celery que es 1 woker/cpu.
+- Al lanzar 400 peticiones concurrentes del escenario 2, en la tarea 246 converter arrojó error '[CRITICAL] WORKER TIMEOUT', por lo cual se debió reducir la prueba a 200 peticiones
+
+## Conclusiones escenario 1
+
+| Datos \ Ambiente                                           | Local         | GCP           | 
+|------------------------------------------------------------|---------------|---------------|
+| RPS (<1500ms)                                              | 7.4           | 6             |
+| Usuarios (<1500ms)                                         | 70            | 56            |
+| Peticiones concurrentes que generan Timeouts (> 10 segs)   | 170           | 146           |
+
+- El desempeño local fue más eficiente que en GCP, el cual se atribuye al esfuerzo que requiere el api en transferir archivos al sistema nfs
+- El desempeño de respuesta en ms en el api fue más constante en su crecimiento que localmente
+
+## Conclusiones escenario 1
+
+| Datos \ Ambiente                                           | Local                | GCP              | 
+|------------------------------------------------------------|----------------------|------------------|
+| Promedio de archivos procesados por minuto                 | 18                   | 3                |
+| Máximo de archivos procesados por minuto                   | 20                   | 7                |
+| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              |
+| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              |
+| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos |
+
+- La reducción de capacidad de workers de 5 a 1 en GCP redujo significativamente el desempeño de conversión
+- La lectura desde nfs en GCP afectó la velocidad de conversión
+- Las limitaciones de hardware redujeron considerablemente la capacidad de peticiones simultáneas a procesar
+
+
