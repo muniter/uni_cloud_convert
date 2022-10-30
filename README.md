@@ -657,7 +657,7 @@ sudo ./startup.py
 - El desempeño local fue más eficiente que en GCP, el cual se atribuye al esfuerzo que requiere el api en transferir archivos al sistema nfs
 - El desempeño de respuesta en ms en el api fue más constante en su crecimiento que localmente
 
-## Conclusiones escenario 1
+## Conclusiones escenario 2
 
 | Datos \ Ambiente                                           | Local                | GCP              | 
 |------------------------------------------------------------|----------------------|------------------|
