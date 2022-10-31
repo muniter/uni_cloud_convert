@@ -74,6 +74,8 @@ Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
 
 ### Ejemplo de conversión
 
+Este es el flujo normal que ocurre cuando un usuario crea una tarea de conversión.
+
 ```mermaid
 sequenceDiagram
   participant cli as Cliente Web
@@ -114,79 +116,114 @@ sequenceDiagram
 | `/benchmark/conversion/data`  | GET    | Obtiene cantidad de tareas procesadas por minuto |   |                                                                                                                                                                            |
 
 Información adicional en documentación del API en Postman en el siguiente link: [documentación API](https://documenter.getpostman.com/view/23989156/2s84LF4Gow), también puede usar [el archivo JSON que describe la API](./collections/Api.postman_collection.json)
-- Configurar environment local con las siguientes variables:
+- Configurar environment con las siguientes variables:
   - protocol: http
-  - host: \<\<IP_MAQUINA_VIRTUAL_APP\>\>:8000
-- Configurar environment GCP con las siguientes variables:
-  - protocol: http
-  - host: \<\<IP_MAQUINA_GCP_API\>\>
+  - host: \<\<IP_DE_LA_API\>\>
 
-## Instrucciones Generales de despliegue local
-
-### Inicializar máquina virtual
+## Instrucciones Generales de despliegue
 
 Requerimientos:
-- Máquina virtual de despliegue
-  - Hypervisor: VirtualBox
-  - Capacidad: 2Gb ram, 1 vCPU, 30 Gb
-    - Nota: más adelante en el análisis de capacidad se brinda detalles acerca de las razones para establecer esta configuración como predeterminada
-  - Nombre: app_uni_cloud_convert
-  - Tipo: Linux
-  - Versión: Ubuntu (64-bit)
-  - Tipo de adaptador de red: adaptador puente
-    - Nota: se opta por adaptador puente para facilitar la comunicación entre máquinas virtuales a través del mismo segmento de red
+  - Infraestructura:
+    - 4 Máquinas virtuales tipo N1 f1-micro para los servicios
+      - Debian 11 (bullseye)
+    - 1 Instancia de cloud sql de desarrollo con Postgres 14
 - Software a instalar
-  - Ubuntu server 20.04 LTS o superior
-    - Git: ya incluido con la imágen Ubuntu
-    - OpenSSH server: incluir su instalación durante el proceso de instalación de Ubuntu
-  - Docker
-    - Seleccionar package Docker durante el proceso de instalación de Ubuntu
-- Parámetros del SO
-  - Nombre: User Linux
-  - Nombre de servidor: appunicloudconvert
-  - username: userlinux
-  - password: \<\<PASS\>\>
-- Configuraciones post
-  - Instalar utilidades de red
-    - ```sudo apt install net-tools```
-  - Consultar ip
-    - ```ifconfig```
+    - Git
+    - Docker
+    - nfs-commons: utilidades nfs
 
-### Despliegue
+### Instrucciones comunes
+
+Los siguientes pasos son iguales para todas las máquinas a instalar, **se suponen lo siguiente**:
+
+- Se escogió el tipo correcto de instancia
+- **Las instancias comparten la misma red privada**
+- **Las instancias deben llamarse**: api, rabbitmq, converter, nfs
+- Las instancias tienen habilitado tráfico http (configuración al crearlas)
+- Su usuario es `maestria`, y su home directory es `/home/maestria`
+- Tiene acceso a root
+
+1. Instalar dependencias:
 
 ```bash
-# 1. Clonar repositorio
-git clone https://github.com/muniter/uni_cloud_convert.git
-# 2. Entrar a carpeta
-cd uni_cloud_convert
-# 3. Levantar aplicación
-sudo docker compose up
+sudo apt update && sudo apt install git docker docker-compose nfs-common
 ```
 
-Levantar todo en docker puede tomar unos minutos mientras se descargan las imágenes, será claro que ya está corriendo cuando se vean la cantidad de logs del sistema.
-
-
-### Destruir / Tear Down
-
-Lo siguiente parará (si están corriendo) los contenedores, los elimina y también elimina los volúmenes. De tal forma que al levantar de nuevo el aplicativo empieza en blanco.
+2. Clonar el repositorio
 
 ```bash
-# Se eliminan los volúmenes y también los archivos
-# que se han recibido para conversión
-sudo docker compose down -v && sudo rm -rf ./assets/*
+git clone https://github.com/muniter/uni_cloud_convert.git
+```
+
+3. Entrar a la carpeta
+
+```bash
+cd uni_cloud_convert
+```
+
+#### NFS
+
+**El NFS debe ser el primer componente en ser desplegado, para que el API y converter puedan montar el share**.
+
+1. Estando en la base del repositorio moverse a la carpeta [nfs](./nfs) y correr el script de startup.
+
+```bash
+cd uni_cloud_convert/nfs
+sudo ./startup.py
+```
+
+#### Rabbit
+
+1. Estando en la base del repositorio moverse a la carpeta [rabbit-mq](./rabbit-mq) y correr el script de startup.
+
+```bash
+cd uni_cloud_convert/rabbit-mq
+sudo ./startup.py
+```
+
+#### Database
+
+Crear la instancia en Cloud-SQL de Postgres.
+
+Puede seguir las [siguientes instrucciones](https://cloud.google.com/sql/docs/postgres/create-instance) para la creación.
+
+**Nota: es muy importante que seleccione que la instancia tenga Private IP y comparta la misma red que los compute engine.** Para que se puedan comunicar.
+
+Si tiene algún problema en la configuración de Private IP pude seguir el [siguiente instructivo](https://cloud.google.com/sql/docs/postgres/configure-private-ip)
+
+#### API
+
+1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
+1. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
+
+```bash
+cd uni_cloud_convert/services/api
+sudo ./startup.py
+```
+
+#### Converter
+
+1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
+1. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
+
+```bash
+cd uni_cloud_convert/services/converter
+sudo ./startup.py
 ```
 
 ### Health Checks
+
+Con estas instrucciones están listo el despliegue, se puede continuar haciendo health checks.
 
 Para confirmar el funcionamiento de las partes de la app:
 
 ```bash
 # Cliente Web (En el response se verá el resultado)
-curl localhost:8000/api-health
+curl $API_PUBLIC_IP/api-health
 # Converter (Revisar los logs para ver el resultado)
-curl localhost:8000/converter-health
+curl $API_PUBLIC_IP/converter-health
 # Ping, pong style (mirar los logs)
-curl localhost:8000/ping
+curl $API_PUBLIC_IP/ping
 ```
 
 ### Comandos frecuentes
@@ -196,143 +233,108 @@ top
 # Rendimiento de containers
 sudo docker stats
 # Containers en ejecución
-sudo docker container ls 
+sudo docker container ls
 # conectarse a un container en particular con bash 
-sudo docker exec -it <<containerid>> bash
+sudo docker exec -it <<container_name>> bash
 ```
-
-## Instrucciones Generales de despliegue GCP
-### Iniciar máquinas Google Cloud Compute engine 
-- nfs
-- rabbitmq
-- api
-- converter
-
-### Verificar disponibilidad de base de datos en Cloud SQL
-- database-gcp
-  ```bash
-  # activar Cloud SQL Admin API: 
-  gcloud services enable sqladmin.googleapis.com
-  # esperar unos minutos a que se despliegue el cambio en los sistemas
-  # configurar ip privada
-  ```
-
-### Prueba del servicio
-*En GCP realizar los pasos en cada CE api y converter en las rutas /service/api y /service/converter respectivamente*
-
-- Habilitar envío de notificación por correo electrónico
-  ```bash
-  # uni_cloud_convert / .env (en GCP configurar en CE converter)
-  STRESS_TEST=0
-  ```
-- Reiniciar contenedores desde cero
-  ```bash
-  sudo docker compose down -v && sudo rm -rf ./assets/*
-  ```
-- Levantar aplicación
-  ```bash
-  sudo docker compose up
-  ```
-- 1 - Signup - /api/auth/signup
-  - ingresar usuario, password y email de notificación
-- 2 - Login - /api/auth/login
-  - ingresar usuario y password. Capturar \<\<TOKEN DE AUTORIZACIÓN\>\> y \<\<TASK ID\>\>
-- 4 - Create task - /api/tasks:  
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - seleccionar archivo y formato de conversión deseado
-- 3 - Get all tasks - /api/tasks
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - verificar tarea creada
-- 5 - Get task - /api/tasks/\<id\>
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - Reemplazar \<id\> con \<\<TASK ID\>\>
-  - Verificar estado de la tarea en *processed*
-  - Verificar recepción de correo de notificación - identificar archivo de descarga \<\<FILENAME\>\>
-    - Reemplazar en el link *localhost* con la \<\<IP MAQUINA VIRTUAL APP\>\>
-- 8 - Download file - /api/files/\<filename\>
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - Reemplazar \<\<FILENAME\>\>
-  - Confirmar descarga del archivo convertido
-- 6 - Change format - /api/tasks/\<id\>
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - Reemplazar \<id\> con \<\<TASK ID\>\>
-  - Ingresar newFormat con el formato deseado
-- Repetir pasos 3 y 5 para confirmar la actualización de la tarea y el estado *processed*
-  - Verificar recepción de correo de notificación
-- 7 - Delete task - /api/tasks/\<id\>
-  - actualizar Header / Authorization: Bearer \<\<TOKEN DE AUTORIZACIÓN\>\>
-  - Reemplazar \<id\> con \<\<TASK ID\>\>
-- Repetir pasos 3 y 5 para confirmar la eliminación de la tarea
 
 <div style="page-break-after: always; visibility: hidden"> 
 </div>
 
 # Análisis de Capacidad
 
+
+Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1).**
+
 Se realizan pruebas de carga y estrés a la aplicación para lograr dimensionar la capacidad de la misma en un entorno de infraestructura definido. A continuación se describen las pruebas realizadas, los análisis de los resultados y las conclusiones sobre el rendimiento de la aplicación
 
-## Inicializar máquina virtual 
-
-### máquina de prueba local
+## Inicializar máquina virtual de prueba
 
 Requerimientos:
-- Máquina virtual de despliegue
-  - Hypervisor: VirtualBox
-  - Capacidad: 2Gb ram, 1 vCPU, 10 Gb
-  - Nombre: tests_uni_cloud_convert
-  - Tipo: Linux
-  - Versión: Ubuntu (64-bit)
-  - Tipo de adaptador de red: adaptador puente
-    - Nota: se opta por adaptador puente para facilitar la comunicación entre máquinas virtuales a través del mismo segmento de red
+- 1 Máquina virtual tipo E2 e2-small para las pruebas
+  - Debian 11 (bullseye)
 - Software a instalar
-  - Ubuntu server 20.04 LTS o superior
-    - Git: ya incluido con la imágen Ubuntu
-    - OpenSSH server: incluir su instalación durante el proceso de instalación de Ubuntu
-- Parámetros del SO
-  - Nombre: User Linux
-  - Nombre de servidor: testsunicloudconvert
-  - username: userlinux
-  - password: \<\<PASS\>\>
+    - Git
+    - Python3
+    - pip: Python package manager
+    - locust
 
-### Máquina virtual de prueba en GCP
-- Compute Engine
-  - Nombre: test
-  - Tipo de máquina: e2-small
-  - Vcpu: 2
-  - Ram: 2 Gb
-  - SO: Ubuntu
+### Instrucciones
 
-## Complementar en máquina de prueba
-- Configuraciones post
-  - Instalar utilidades de red
-    - ```sudo apt install net-tools```
-  - Instalar pip
-    - ```sudo apt install python3-pip```
-  - Consultar ip
-    - ```ifconfig```
+1. Clonar el repositorio
+
+```bash
+git clone https://github.com/muniter/uni_cloud_convert.git
+```
+
+2. Instalar dependencias
+
+```bash
+sudo apt install python3 python3-pip
+```
+
+3. Cambiar de usuario a root:
+
+```bash
+sudo su
+```
+
+4. Instalar locust
+
+```bash
+pip install locust==2.12.2
+```
+
+5. Cerrar sesión: necesario para que posteriormente aparezca el comando `locust` en `$PATH`
+
+```bash
+exit
+```
+
+6. Iniciar sesión y colocarse como usuario root
+
+```bash
+sudo su
+```
+
+7. Habilitar variable de entorno `STRESS_TEST` en la máquina converter.
+
+**NOTA: Antes de correr cualquier prueba no olvide deshabilitar el envío de correos, editando en el archivo [.env](./.env):**
+
+```bash
+STRESS_TEST=1
+```
 
 ## Preámbulo
 
-### Hallazgos en instalación de Máquinas virtuales locales
+### Hallazgos en ejecución en máquinas virtuales
 
-El proceso de preparación de máquinas virtuales para despliegue y pruebas permitió identificar la configuración predeterminada plasmada. A continuación se comparten los hallazgos más relevantes, los cuales motivaron la definición de parámetros sugeridos:
+Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1).**
 
-- Memoria: La configuración sugerida inicialmente era 1Gb de RAM, sin embargo, docker (componente adicional del sistema) consume 700Mb. 
-  - Por este motivo, se sugiere la configuración predeterminada en 2Gb de RAM
-- Almacenamiento: La configuración sugerida inicialmente era de 10Gb de almacenamiento, sin embargo, Ubuntu Server consume alrededor del 90% del disco, dejando disponibles menos de 1Gb para la operación del servicio. 
-  - El comportamiento con una configuración de 10Gb fue el siguiente:
-    - Uso del servicio: satisfactorio. El consumo del API y las funcionalidades de la aplicación se logran realizar correctamente
-    - Escenarios de carga y estress: falla del sistema
-      - Los escenarios de carga y estress se modelaron con archivos de 5Mb, por lo cual una prueba estándar de 100 peticiones genera como mínimo 710Mb de almacenamiento de archivos (500Mb de archivos cargados + 210Mb de archivos convertidos)
-      - Teniendo en cuenta la limitante de almacenamiento (menor a 1Gb), correr un escenario de carga y estress provoca fallas en el sistema por falta de capacidad en almacenamiento
-      - Cuando sucede la falla, se identifica el siguiente comportamiento en los componentes:
-        - Rabbit-mq: inicialmente arroja una alerta indicando que no hay espacio suficiente en disco; posteriormente arroja un error y el contenedor específico se cierra abrutamente 
-        - Converter: pierde conexión a la cola de mensajería, sin embargo, continua operando
-        - Postgresql: arroja alertas por capacidad de disco, intenta reiniciar el servicio de bd periódicamente, sin embargo, continua operando
-        - Api: continua operando
-  - Para efectos de lograr generar escenarios de carga y estress que permitieran poner a prueba todos los componentes de la aplicación, se sugiere la configuración predeterminada de 30Gb de almacenamiento
-- Procesamiento: Se mantiene la configuración sugerida de 1vCPU. En los escenarios no se observa saturación o desbordamiento de capacidad
-  - Nota informativa: como laboratorio se intentó configurar una máquina virtual con 2vCPU en VirtualBox con Ubuntu, sin embargo el proceso de instalación del SO no finaliza correctamente con esta configuración y al reiniciar no levanta los servicios correctamente. Al no tener un impacto relevante para las pruebas de la aplicación, solo se identifica el hallazgo y se continua el uso de 1vCPU
+- Incremento en nivel de complejidad: En el entorno de una sola máquina era solo usar un comando para levantar todo, ahora es necesario orquestar múltiples cosas.
+- La aplicación opera de forma satisfactoria con los diferentes servicios corriendo en su propia máquina.
+
+#### Procesamiento CPU
+
+- Pasamos de 2vCPU a 4 máquinas con 1vCPU c/u y se removió un servicio a PaaS (SQL).
+  - Sin embargo se redujo la capacidad de procesamiento tanto en el API como el converter que son los que más demandaban la CPU.
+  - Los componentes NFS, Database, y Rabbit no fueron afectados, debido a la baja demanda que hacemos a estos.
+  - Debido a que el convertidor pasó a solo tener 1vCPU hubo la necesidad de reducir el número de workers que celery invocaba de 5 a 1. La vCPU del sistema se bloqueaba completamente con la configuración anterior.
+- En general este sistema es principalmente bottlenecked por los recursos de CPU.
+- La introducción del sistema NFS afecta el aprovechamiento de recursos de CPU pues al python trabajar single threaded y blocking, se introducen considerables demoras al escribir un archivo a disco.
+
+#### Memoria
+
+- Pasamos de 2Gb a 2.4Gb de memoria distribuido.
+  - Esta cantidad de memoria es suficiente para el uso de la aplicación, no presentó problemas.
+  - Debido a que el converter está invocando un programa escrito eficiente `ffmpeg` escrito en C, la capacidad de memoria es suficiente.
+
+#### Almacenamiento
+
+- Pasamos de tener 30Gb de almacenamiento a 40Gb
+- La imagen de Debian instalada en las máquinas estaba muy optimizada a ocupar poco espacio menos de 2Gb
+  - Por lo cual los 8Gb de espacio restante por máquina fueron suficientes.
+- La introducción de NFS **introdujo inmensas latencias en la escritura a disco**.
 
 ## Escenarios del Plan de pruebas
 
@@ -378,77 +380,55 @@ sequenceDiagram
 
 #### Instrucciones
 
-Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) para inicializar en al parte superior del documento.
+Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-generales-de-despliegue), tener la aplicación funcionando ([probar con health checks](#health-checks)) y haber seguido las instrucciones para [inicializar la máquina de pruebas](#inicializar-máquina-virtual-de-prueba).
 
-- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert (CE converter en GCP)
-    ```bash
-    # uni_cloud_convert / .env 
-    STRESS_TEST=1
-    ```
-- Reiniciar contenedores desde cero en appunicloudconvert (ce y converter en GCP)
-    ```bash
-    sudo docker compose down -v && sudo rm -rf ./assets/*
-    ```
-- Levantar aplicación
-  ```bash
-  sudo docker compose up
-  ```
-1. Instalar locust en máquina virtual testsunicloudconvert (test en GCP):
-    ```bash
-    pip install locust
-    ```
+1. Hacer login a la máquina de pruebas, y ser el usuario root:
 
-2. Obtener **IP de la máquina virtual donde esta corriendo la aplicación.** (máquina virtual appunicloudconvert)
-    ```bash
-    # comando en máquina local
-    ifconfig
-    ``` 
+```bash
+# Ser usuario root
+sudo su
+```
 
-2. Obtener **IP de la máquina virtual donde esta corriendo el test.** (máquina virtual testsunicloudconvert)
-    ```bash
-    ifconfig
-    ``` 
+2. Iniciar locust
 
-3. Copiar archivo locustfile.py y sample.mp3 del repositorio y ubicarlos en el directorio desde donde se ejecutará locust
+```bash
+# NOTA: reemplazar por la IP_DE_MAQUINA_VIRTUAL_APP
+locust --host=http://api --users=400 --spawn-rate=2 --web-port --autostart
+```
 
-4. Iniciar locust en testsunicloudconvert (test en GCP)
+3. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST` para ver la interfaz de locust podrá ver tab de **estadísticas, gráficas e instrucciones**.
 
-    ```bash
-    # máquina local: reemplazar por la IP_DE_MAQUINA_VIRTUAL_APP. 
-    locust --host=http://IP_DE_MAQUINA_VIRTUAL_APP:8000 --users=400 --spawn-rate=2 --autostart
-    # máquina test en gcp
-    locust --host=http://api:80 --users=400 --spawn-rate=2 --web-port=80 --autostart
-    ```
+#### Resultados
 
-4. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST:8089` en máquina local, o, `http://IP_PUBLICA_GCP_TEST:80` en GCP, para ver la interfaz de locust podrá ver tab de **estadisticas, gráficas e instrucciones**.
+El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-1-2]
 
-#### Resultados en máquina local
-
-El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-1]
+Nota: El informe de el ***despliegue local*** [se puede consultar aquí para comparación][@res-scenario-1-1]
 
 Estos son los puntos principales:
-- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 70 usuarios concurrentes, atendiendo a 7.4 request/segundo.
-- El aplicativo es capaz de atender 440 request/minuto con archivos para conversión.
-- El aplicativo se satura fuertemente a los 110 usuarios concurrentes con una respuesta media de 3.7 segundos.
-- El aplicativo comienza a tener errores de timeout (request con más de 10 segundos de demora) con 170 usuarios concurrentes.
+- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 66 usuarios concurrentes, atendiendo a 6 request/segundo, esto es una disminución comparado al despliegue local que fueron 70 usuarios y 7.4 request/segundo.
+- El aplicativo es capaz de atender 360 request/minuto con archivos para conversión.
+- La curva de tiempo de respuesta es mucho más suavizada que el despliegue local, es más predecible. Esto lo atribuimos al hecho de que el convertidor no está compartiendo CPU con el API.
+- El aplicativo se satura fuertemente a los 86 usuarios concurrentes con una respuesta media de 4.1 segundos.
+- El aplicativo comienza a tener errores de timeout (request con más de 10 segundos de demora) con 146 usuarios concurrentes, a diferencia de local con 170 usuario.
 
-Durante la operación en punto crítico esta era la utilización de recursos:
+Cuadro comparativo:
 
-> *obtenida con `docker stats`*
+| Datos \ Ambiente                                         | Local         | GCP         |
+|----------------------------------------------------------|---------------|-------------|
+| RPS (<1500ms)                                            | 7.4s, 440/min | 6s, 360/min |
+| Usuarios (<1500ms)                                       | 70            | 56          |
+| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170           | 146         |
 
-| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT   | MEM %  | NET I/O         | BLOCK I/O       | PIDS |
-|--------------|-----------|---------|---------------------|--------|-----------------|-----------------|------|
-| 1e8053e774a9 | api       | 74.14%  | 147.7MiB / 1.929GiB | 7.48%  | 1.82GB / 3.39MB | 50.4MB / 4.29GB | 3    |
-| e28e11546b38 | converter | 111.86% | 308.4MiB / 1.929GiB | 15.61% | 90.4kB / 59.9kB | 403MB / 746MB   | 21   |
-| 75e643db542e | rabbit-mq | 0.77%   | 110.3MiB / 1.929GiB | 5.58%  | 329kB / 94.7kB  | 101MB / 2.4MB   | 26   |
-| 802a21b1240c | database  | 1.72%   | 44.35MiB / 1.929GiB | 2.24%  | 774kB / 707kB   | 90.7MB / 117MB  | 13   |
+Durante la operación en punto crítico esta era la utilización de recursos del API:
+
+> *obtenida con con el dashboard de GCP
+
+![image](https://user-images.githubusercontent.com/9699804/198908130-33659f14-204a-46e4-8b99-759a884bac5a.png)
 
 A partir de esto:
-- El aplicativo se encuentra principalmente restringido por la capacidad de procesamiento (CPU)
-- El convertidor es el mayor consumidor de CPU
-- El mayor consumidor de memoria es el convertidor
-- Debido a la alta carga de request el API toma recursos que necesita el converter, haciendo lento su trabajo.
-- Los componentes rabbit y database por estar escritos en lenguajes low level son mucho más eficiente en uso de recursos.
+- El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU)
+- Durante un periodo de tiempo está usando más CPU de la que es asignada (esta es una propiedad de la máquina F1 asignada), el incremento y posterior estabilización de cantidad de CPU disponible lo vemos marcadamente con los incrementos en tiempo de respuesta.
+- El **API** esta **restringida** por recursos CPU.
 
 ### 2. Capacidad de conversiones
 
@@ -487,177 +467,15 @@ sequenceDiagram
   co->>co: Conversión
 ```
 
-#### Resultados en máquina local
+**Nota**: en este escenario fue necesario cambiar de 400 conversiones en la versión local, a 200 conversiones. Debido a que el tiempo que le tomaba al API copiar 400 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 246), debido a la latencia inducida por el nfs (synchronous file writing)
 
-**Estado del sistema**
+#### Resultados
 
-Docker stats
+El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-2-2]
 
-| CONTAINER ID | NAME      | CPU %   | MEM USAGE / LIMIT  | MEM %  | NET I/O       | BLOCK I/O       | PIDS |
-|--------------|-----------|---------|--------------------|--------|---------------|-----------------|------|
-| de76416b2310 | converter | 273.11% | 470.9MiB / 1.93GiB | 23.83% | 309kB / 251kB | 1.37GB / 6.05GB | 21   |
-| a088a7065d76 | api       | 0.05%   | 113.1MiB / 1.93GiB | 5.72%  | 5.9MB / 879MB | 6.62MB / 10.6GB | 3    |
-| bd8dce77cacf | rabbit-mq | 0.72%   | 104.9MiB / 1.93GiB | 5.31%  | 501kB / 277kB | 29.2MB / 25.2MB | 26   |
-| cf3c71fa7a20 | database  | 0.33%   | 48.67MiB / 1.93GiB | 2.46%  | 613MB / 606MB | 52.4MB / 117MB  | 14   |
+Nota: El informe de el ***despliegue local*** [se puede consultar aquí para comparación][@res-scenario-2-1]
 
-Top
-
-![image](https://user-images.githubusercontent.com/98927955/197672368-27761580-02f4-4cfc-969b-db1947dc1d6b.png)
-
-Tiempo promedio de procesamiento por archivo: 15 segs
-
-![image](https://user-images.githubusercontent.com/98927955/197672468-7909d05d-18a6-4fe9-aa23-314934e35721.png)
-
-Resultado general:
-
-![image](https://user-images.githubusercontent.com/98927955/197673642-7bbf09cc-b43e-4572-b82c-286561241f2f.png)
-
-Resultado particular:
-
-![image](https://user-images.githubusercontent.com/98927955/197673795-b7670ba0-b29e-4a1a-869c-fbd8090a1ac9.png)
-
-
-Los resultados más relevantes son: 
-- Comportamiento de componentes son:
-  - El componente **converter** tiene el mayor consumo de cpu y memoria, producto de la conversión de archivos realizada
-  - El componente **rabbit-mq** no genera un alto consumo de recursos para gestionar la distribución de carga de las 400 peticiones encoladas
-  - El componente **database** no genera alto consumo de recursos a pesar que cada procesamiento es actualizado en el sistema
-  - El componente **api** genera alto consumo de I/O para el paso de archivos, pero su carga baja durante la fase de procesamiento
-  - El comportamiento del procesamiento fue consistente en cuanto a tiempos, en promedio cada conversión tardó alrededor de 15 segundos
-- Procesamiento para 400 solicitudes simultáneas:
-  - Cantidad de archivos procesados en menos de 10 min: 193
-  - Cantidad de archivos procesados en más de 10 min: 207
-  - La cantidad mínima de archivos procesados por minuto fueron: 15
-  - La cantidad máxima de archivos procesados por minuto fueron: 20
-  - La tendencia del sistema fue procesar hasta 20 archivos por minuto con leves intermitencias
-  - El tiempo que tardó el sistema en procesar las 400 solicitudes fue de 21 minutos
-
-**Archivos procesados por minuto: 20**
-
-#### Instrucciones
-
-Debe haber seguido antes las [Insrucciones Generales](#instrucciones-generales) para inicializar en al parte superior del documento.
-
-- Deshabilitar el envío de notificación por correo electrónico en la máquina donde está corriendo la aplicación appunicloudconvert (converter en GCP)
-    ```bash
-    # uni_cloud_convert / .env 
-    STRESS_TEST=1
-    ```
-- Reiniciar contenedores desde cero (api y converter en GCP)
-    ```bash
-    sudo docker compose down -v && sudo rm -rf ./assets/*
-    ```
-- Levantar aplicación
-  ```bash
-  sudo docker compose up
-  ```
-1. Obtener **IP de la máquina virtual donde esta corriendo la aplicación.**
-
-2. Enviar request para iniciar benchmark:
-
-    ```bash
-    # en máquina local
-    curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=400 http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/start
-    # en máquina test de GCP
-    curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=200 http://api:80/benchmark/conversion/start
-    ```
-
-3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
-    ```bash
-    # url desde máquina local
-    http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/data
-    # url desde máquina test en GCP
-    http://IP_API_GCP:80/benchmark/conversion/data
-    ```
-
-4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
-
-4. Obtener datos de procesamiento de todos las tareas para luego ser analizadas en detalle:
-
-> Nota: **require el comando jq para procesar el json**
-
-  ```bash
-  curl http://IP_DE_MAQUINA_VIRTUAL:8000/benchmark/conversion/result | jq -r 'sort_by(.id) |  .[] | [.id, .uploaded_at, .processed_at] | @csv' > ./stats.csv
-  ```
-
-5. Un ejemplo del reporte es el siguiente:[html](https://muniter.github.io/uni_cloud_convert/local_scenario_2), [pdf](https://github.com/muniter/uni_cloud_convert/wiki/Entrega-1---pdfs)
-
-### Limitaciones
-
-- Python y su framework flask no son ideales para aplicaciones intensivas como la transferencia de grandes cantidades de datos (subir archivos)
-- Python y sus utilidades de transformación nos son ideales para actividades que están fuertemente restringidas por el uso de recursos (conversión de archivos).
-
-
-### Conclusiones
-- El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
-- La capacidad de almacenamiento es un factor muy relevante en el funcionamiento del servicio ya que se almacena cada archivo cargado en su versión original y en su versión convertida. Para proyectar un escalamiento a cientos de usuarios finales se recomienda considerar lo siguiente:
-- Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
-- Separar el almacenamiento de los componentes de docker al almacenamiento de archivos de audio, de tal manera que la indisponibilidad de capacidad de almacenamiento de archivos, no afecte el funcionamiento del componente del servicio
-- El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
-- Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
-
-
-<!-- links, leave at the end, this should be invisible -->
-[@RonaldLugo]: https://github.com/RonaldLugo
-[@miso-alejosaur]: https://github.com/miso-alejosaur
-[@htenezaca]: https://github.com/htenezaca
-[@muniter]: https://github.com/muniter
-[@res-scenario-1]: https://muniter.github.io/uni_cloud_convert/local_scenario_1
-
-
-# Pasos
-
-1. Instalar paquetes necesarios
-
-```bash
-sudo apt update && sudo apt install docker docker-compose nfs-common git
-```
-
-1. Configurar permisos para docker
-
-```bash
-sudo usermod -aG docker $USER
-```
-
-1. Cerrar sesión y conectarse de nuevo para que tome los nuevos permisos.
-
-Verificar que todo funciona con el comando:
-
-```bash
-docker ps
-```
-
-1. Clonar el repositorio
-
-```bash
-git clone https://github.com/muniter/uni_cloud_convert.git
-```
-
-1. Cambiar a la carpeta esperada
-
-1. Levantar servicio con el script
-
-```bash
-sudo ./startup.py
-```
-
-## Hallazgos Cloud
-
-- El convertidor por defecto estaba usando 5 workers, lo que resultó demasiado para los recursos de la máquina, por lo cual tocó retornar a la configuración por defecto de celery que es 1 woker/cpu.
-- Al lanzar 400 peticiones concurrentes del escenario 2, en la tarea 246 converter arrojó error '[CRITICAL] WORKER TIMEOUT', por lo cual se debió reducir la prueba a 200 peticiones
-
-## Conclusiones escenario 1
-
-| Datos \ Ambiente                                           | Local         | GCP           | 
-|------------------------------------------------------------|---------------|---------------|
-| RPS (<1500ms)                                              | 7.4           | 6             |
-| Usuarios (<1500ms)                                         | 70            | 56            |
-| Peticiones concurrentes que generan Timeouts (> 10 segs)   | 170           | 146           |
-
-- El desempeño local fue más eficiente que en GCP, el cual se atribuye al esfuerzo que requiere el api en transferir archivos al sistema nfs
-- El desempeño de respuesta en ms en el api fue más constante en su crecimiento que localmente
-
-## Conclusiones escenario 2
+En esta prueba vimos un decremento del 75% de rendimiento  en comparación a las pruebas locales, comparando métricas:
 
 | Datos \ Ambiente                                           | Local                | GCP              | 
 |------------------------------------------------------------|----------------------|------------------|
@@ -668,8 +486,65 @@ sudo ./startup.py
 | Peticiones atendidas en menos de 10 minutos                | 193                  | 28               |
 | Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos |
 
-- La reducción de capacidad de workers de 5 a 1 en GCP redujo significativamente el desempeño de conversión
-- La lectura desde nfs en GCP afectó la velocidad de conversión
-- Las limitaciones de hardware redujeron considerablemente la capacidad de peticiones simultáneas a procesar
+Esto lo atribuimos a:
+- Al ser una tarea CPU bound, la disminución de cores en número y capacidad hizo un gran impacto. Si hacemos una comparación inocente 1vCPU core de GCP equivale a 0.5 CPU core de la máquina virtual que probamos, por tanto el 25% de rendimiento.
+- El punto anterior se compenetra con la necesidad de cambiar la configuración de workers corriendo en el convertidor de 5 a 1, pues la máquina se bloqueaba completamente.
+
+Ahora miremos el consumo de recursos converter:
+
+> *obtenida con con el dashboard de GCP
+
+![image](https://user-images.githubusercontent.com/9699804/198908433-ba4a5f0b-8d64-4eb8-9c75-c04f0581e5ea.png)
+
+- Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 7 archivos en el primer minuto, un poco más del doble del promedio.
+- Esta es una actividad completamente bottlenecked por la CPU por lo cual vemoz que no la deja descanasr en ningún momento.
+- El hecho de que siempre está saturada la CPU confirma que el solo utilizar 1 worker es la decisión correcta, al ser también un proceso 100% síncrono.
 
 
+#### Instrucciones
+
+Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-generales-de-despliegue), tener la aplicación funcionando ([probar con health checks](#health-checks)) y haber seguido las instrucciones para [inicializar la máquina de pruebas](#inicializar-máquina-virtual-de-prueba).
+
+1. Hacer login a la máquina de pruebas
+2. Enviar el request para iniciar el benchmark
+
+```bash
+curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=200 http://api/benchmark/conversion/start
+```
+
+---
+**Ahora desde su máquina local:**
+
+3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
+
+```bash
+http://$IP_DE_LA_API/benchmark/conversion/data
+```
+
+4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
+
+Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-1]
+
+
+### Conclusiones y Limitaciones
+
+**Revisar análisis de resultados de cada escenario**:
+
+- Python y sus utilidades de transformación nos son ideales para actividades que están fuertemente restringidas por el uso de recursos (conversión de archivos).
+- La aplicación tiene como principal bottleneck la CPU para el converter y la api.
+- La introducción de NFS produce gran latencia para escribir el archivo por parte del api, y luego obtenerlo del lado del convertidor.
+- El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
+- Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
+- El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
+- Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
+
+
+<!-- links, leave at the end, this should be invisible -->
+[@RonaldLugo]: https://github.com/RonaldLugo
+[@miso-alejosaur]: https://github.com/miso-alejosaur
+[@htenezaca]: https://github.com/htenezaca
+[@muniter]: https://github.com/muniter
+[@res-scenario-1-1]: https://muniter.github.io/uni_cloud_convert/local_scenario_1
+[@res-scenario-1-2]: https://muniter.github.io/uni_cloud_convert/gcp_local_escenario_1
+[@res-scenario-2-1]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/local_scenario_2.pdf
+[@res-scenario-2-2]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/gcp_local_escenario_2.pdf
