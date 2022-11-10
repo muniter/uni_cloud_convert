@@ -27,6 +27,7 @@ def get_file(object_name: str, destination: Path):
     logger.info(f"Downloading file: {object_name} from GCP")
     blob = bucket.blob(object_name)
     blob.download_to_filename(destination)
+    logger.info(f"Downloaded file: {object_name} from GCP")
 
 
 def put_file(filename: Path):
@@ -35,3 +36,4 @@ def put_file(filename: Path):
     blob = bucket.blob(base)
     logger.info(f"Uploading file: {base} to GCP")
     blob.upload_from_filename(filename)
+    logger.info(f"Uploaded file: {base} to GCP")

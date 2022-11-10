@@ -78,9 +78,11 @@ def make_conversion(self, file_id, filename, expected_format, email):
 
     destination = Path("/tmp", Path(Path(filename).stem + f".{expected_format}"))
 
+    logger.info(f"Conversion of {filename} to {expected_format} started")
     # convert wav to mp3
     sound = AudioSegment.from_file(source)
     sound.export(destination)
+    logger.info(f"Conversion of {filename} to {expected_format} finished")
 
     # Upload the file to the cloud
     put_file(destination)
