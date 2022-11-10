@@ -62,12 +62,22 @@ def benchmark_conversion_result():
 
 @app.route("/benchmark/conversion/data", methods=["GET"])
 def benchmark_conversion_data():
-    data = db_session.execute("select d.diff as min, count(d.id) from (select id, ceil(extract(epoch from (processed_at - uploaded_at)) / 60) as diff from tasks where processed_at is not null) as d group by d.diff order by min")
+    data = db_session.execute(
+        """
+        SELECT d.diff AS min,
+               Count(d.id)
+        FROM   (SELECT id,
+                       Ceil(Extract(epoch FROM ( processed_at - uploaded_at )) / 60) AS
+                       diff
+                FROM   tasks
+                WHERE  processed_at IS NOT NULL) AS d
+        GROUP  BY d.diff
+        ORDER  BY min  
+        """
+    )
     response = jsonify([data_serialize(row) for row in data])
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
-    
-    """ return [data_serialize(row) for row in data], 200 """
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["GET"])
