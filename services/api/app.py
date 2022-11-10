@@ -41,6 +41,8 @@ def shutdown_session(exception=None):
 
 @app.before_first_request
 def init():
+    from cloud import initialize_bucket
+    initialize_bucket()
     app.logger.info("Got the first request, initializing the database")
     init_db()
     app.logger.info("Database initialized")
