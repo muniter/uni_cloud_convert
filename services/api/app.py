@@ -11,8 +11,6 @@ app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
-app.config["UPLOAD_FOLDER"] = "/mnt/uploaded_files"
-app.config["CONVERTED_FOLDER"] = "/mnt/converted_files"
 app.config["ALLOWED_FORMATS"] = {"mp3", "acc", "ogg", "wav", "wma"}
 app.config.update(CELERY_CONFIG={"broker_url": os.environ.get("CELERY_BROKER_URL")})
 
@@ -43,11 +41,6 @@ def shutdown_session(exception=None):
 
 @app.before_first_request
 def init():
-    # Set up the upload folder
-    UPLOAD_FOLDER = app.config["UPLOAD_FOLDER"]
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.mkdir(UPLOAD_FOLDER)
-
     app.logger.info("Got the first request, initializing the database")
     init_db()
     app.logger.info("Database initialized")

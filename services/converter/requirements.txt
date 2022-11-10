@@ -3,3 +3,4 @@ SQLAlchemy==1.4.41
 psycopg2==2.9.4
 pydub==0.25.1
 sendgrid==6.9.7
+google-cloud-storage==2.6.0

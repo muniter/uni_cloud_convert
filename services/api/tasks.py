@@ -1,8 +1,9 @@
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import json
 import uuid
 from sqlalchemy import select, and_
+from cloud import delete_file, get_file, put_file
 from database import db_session
 from datetime import datetime
 from app import app
@@ -120,7 +121,7 @@ def delete_task(task_id: int):
 
 @app.route("/api/files/<string:file_id>", methods=["GET"])
 @validate()
-def get_file(file_id: str):
+def get_converted_file(file_id: str):
     task = (
         db_session.execute(select([Task]).where(and_(Task.file_id == file_id)))
         .scalars()
@@ -133,7 +134,8 @@ def get_file(file_id: str):
     if task.status != "processed":
         return {"message": "File not ready"}, 400
 
-    file_path = os.path.join(app.config["CONVERTED_FOLDER"], task.processed_file)
+    file_path = Path("/tmp", task.processed_file)
+    get_file(task.processed_file, file_path)
     return send_file(file_path, as_attachment=True)
 
 
@@ -141,13 +143,16 @@ def create_db_task(file, user_id, new_format, commit=True) -> tuple[Task, User]:
     file_id = str(uuid.uuid4())
     file_extension = Path(file.filename).suffix.lstrip(".")
     file_upload_name = f"{file_id}.{file_extension}"
-    file_upload_path = os.path.join(app.config["UPLOAD_FOLDER"], file_upload_name)
+    file_upload_path = Path("/tmp", file_upload_name)
 
-    file.save(file_upload_path)
+    # Save, pass path to gcp and then delete local
+    file.save(str(file_upload_path))
     file_size = os.stat(file_upload_path).st_size
-
     if file_size == 0:
         raise Exception("File is empty")
+
+    put_file(file_upload_path)
+    os.remove(file_upload_path)
 
     new_task = Task(
         user_id=user_id,
@@ -252,9 +257,7 @@ def update_task(task_id: int, body: TaskUpdateBody):
 
     if task.processed_file:
         app.logger.info("hay archivo procesado anteriormente")
-        prev = os.path.join(app.config["CONVERTED_FOLDER"], task.processed_file)
-        if os.path.exists(prev):
-            os.remove(prev)
+        delete_file(task.processed_file)
 
     task.timestamp = datetime.utcnow()
     task.status = "uploaded"
