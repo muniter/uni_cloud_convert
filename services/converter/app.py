@@ -4,6 +4,7 @@ from pydub import AudioSegment
 from celery import Celery
 from email_service import send_notification
 from database import db_session
+from cloud import get_file, put_file
 
 import logging
 
@@ -13,11 +14,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("converter")
-mnt_dir = "/mnt"
-# Setup dst_dir
-dst_dir = Path(mnt_dir) / "converted_files"
-if not dst_dir.exists():
-    dst_dir.mkdir()
 
 # RabbitMQ connection, read from the environment
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
@@ -67,24 +63,36 @@ def mark_conversion(file_id, processed_file, processed_format, processed_size):
 @app.task(name="convert", bind=True)
 def make_conversion(self, file_id, filename, expected_format, email):
     logger.info(f"Converting {filename} to {expected_format}")
-    without_extension = Path(filename).stem
 
-    src = Path(mnt_dir, "uploaded_files", filename)
+    # Download the file from the cloud to temp dir
+    source = Path("/tmp", filename)
+    get_file(filename, source)
+
     # Since file is in a nfs mount let's check for existence first
-    if not src.exists():
+    if not source.exists():
         # Retry the task in 5 seconds
         logger.error(f"File {filename} not found, task will be retried")
         return self.retry(
-            countdown=5, max_retries=5, exc=FileNotFoundError(f"{src} not found")
+            countdown=5, max_retries=5, exc=FileNotFoundError(f"{filename} not found")
         )
-    processed_name = f"{without_extension}.{expected_format}"
-    dst = Path(dst_dir, processed_name)
 
+    destination = Path("/tmp", Path(Path(filename).stem + f".{expected_format}"))
+
+    logger.info(f"Conversion of {filename} to {expected_format} started")
     # convert wav to mp3
-    sound = AudioSegment.from_file(src)
-    sound.export(dst)
-    processed_size = dst.stat().st_size
-    mark_conversion(file_id, processed_name, expected_format, processed_size)
+    sound = AudioSegment.from_file(source)
+    sound.export(destination)
+    logger.info(f"Conversion of {filename} to {expected_format} finished")
+
+    # Upload the file to the cloud
+    put_file(destination)
+    processed_size = destination.stat().st_size
+    mark_conversion(file_id, destination.name, expected_format, processed_size)
+
+    # Cleanup the temp files
+    source.unlink()
+    destination.unlink()
+
     # ToDo if no es test
     send_notification(email, file_id)
     logger.info(f"Conversion for file_id: {file_id} completed")
