@@ -1,4 +1,4 @@
-$.getJSON("http://192.168.10.26:8000/benchmark/conversion/data", function(obj) {
+$.getJSON("http://34.149.97.235:80/benchmark/conversion/data", function(obj) {
 
   const ctx = document.getElementById('myChart').getContext('2d');
   const counts = obj.map(x => x.count)
