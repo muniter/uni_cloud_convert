@@ -528,14 +528,10 @@ Cuadro comparativo:
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
 > *obtenida con el monitoring del Managed Instance Group de GCP
-
-TODO: reemplazar imágen 
-![image](https://user-images.githubusercontent.com/9699804/198908130-33659f14-204a-46e4-8b99-759a884bac5a.png)
+![image](https://user-images.githubusercontent.com/98927955/201498855-ab794364-fad9-49d8-a5af-70d985ff99fa.png)
 
 > *obtenida con el dashboard configurado explícitamente en monitoring de GCP
-
-TODO: reemplazar imágen 
-![image](https://user-images.githubusercontent.com/9699804/198908130-33659f14-204a-46e4-8b99-759a884bac5a.png)
+![image](https://user-images.githubusercontent.com/98927955/201498862-3f63d317-81ec-4fd6-907d-51bc43025047.png)
 
 A partir de esto:
 - El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en el Managed Instance Group, que en este caso es del 180% (60% por cada instancia)
@@ -609,8 +605,7 @@ Esto lo atribuimos a:
 Ahora miremos el consumo de recursos converter:
 
 > *obtenida con con el dashboard de GCP
-TODO: reemplazar imagen
-![image](https://user-images.githubusercontent.com/9699804/198908433-ba4a5f0b-8d64-4eb8-9c75-c04f0581e5ea.png)
+![image](https://user-images.githubusercontent.com/98927955/201498871-7fe32012-cc91-4ea2-b891-ce8bb4f29461.png)
 
 - Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 7 archivos en el primer minuto, un poco más del doble del promedio.
 - Esta es una actividad completamente bottlenecked por la CPU por lo cual vemos que no la deja descansar en ningún momento.
