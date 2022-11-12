@@ -2,41 +2,11 @@
 import os
 import subprocess
 
-PATH = "./assets"
-NFS_NEEDS = ["api", "converter"]
-
 
 def check_root():
     if os.geteuid() != 0:
         print("Please run as root, sudo foooo")
         exit(1)
-
-
-def setup_nfs_mount():
-    hostname = os.uname().nodename
-    if hostname not in NFS_NEEDS:
-        print("Skipping NFS mount setup, {} is not in {}".format(hostname, NFS_NEEDS))
-        return
-
-    if not os.path.exists(PATH):
-        os.makedirs(PATH)
-
-    out = subprocess.run(
-        "df | grep 'nfs'",
-        shell=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    if out.returncode != 0:
-        print("nfs share mount not found, trying to mount")
-        out = subprocess.run(["mount", "-t", "nfs", "nfs:/", PATH])
-        if out.returncode != 0:
-            print("Failed to mount the nfs share")
-            exit(1)
-        else:
-            print("nfs share mounted successfully")
-    else:
-        print("nfs share already mounted")
 
 
 def get_docker_command():
@@ -74,7 +44,6 @@ def start_docker_compose():
 
 def main():
     check_root()
-    setup_nfs_mount()
     start_docker_compose()
 
 

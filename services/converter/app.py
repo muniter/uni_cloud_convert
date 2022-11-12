@@ -68,7 +68,6 @@ def make_conversion(self, file_id, filename, expected_format, email):
     source = Path("/tmp", filename)
     get_file(filename, source)
 
-    # Since file is in a nfs mount let's check for existence first
     if not source.exists():
         # Retry the task in 5 seconds
         logger.error(f"File {filename} not found, task will be retried")
