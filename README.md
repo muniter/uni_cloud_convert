@@ -13,34 +13,65 @@ Aplicación que convierte archivos entre los siguientes formatos de audio: MP3, 
 
 Desarrollar un servicio de conversión entre diferentes formatos de audio y poner a prueba su rendimiento y capacidad bajo unas características de infraestructura local definidas
 
+* alcance semana 3: escalabilidad en la capa web
+
 ## Arquitectura
 
-Versión: **máquinas virtuales en GCP**
+Versión: **máquinas virtuales en GCP + escalabilidad en capa web**
 
 La siguiente es la arquitectura de la aplicación
 
 Convención del diagrama:  
+**GCP**: Google Cloud Platform  
 **CE**: Google Cloud Compute engine  
 **SQL**: Google Cloud SQL  
+**LB**: Load Balancer  
+**MIG**: Managed Instance Group  
+**TMP**: Instance Template  
+**MBR**: Message Broker Rabbit  
+**GCS**: Google Cloud Storage  
 
 ```mermaid
 flowchart TD
-  subgraph Cliente
-    web[Cliente Web]
+  subgraph Client
+    web[Web Client]
   end
-  web<-->api
-  subgraph Servicios
-    api[API - CE]
-    co[Converter - CE]
-    mb[Message Broker Rabbit - CE]
-    db[Database - SQL]
-    nfs[NFS Server - CE]
-    api<-->mb
-    api<-->nfs
-    api-->db
-    co<-->nfs
+  subgraph MAIL
+    mail[Sendgrid]
+  end
+  web<--http-->LB
+  subgraph GCP
+    subgraph LB
+      bal[Load Balancer]
+    end
+    LB <--> MIG
+    subgraph MIG[Managed Instance Group]
+      direction BT
+      api1[API instance 1 - CE]
+      api2[API instance 2 - CE]
+      apin[API instance 3 - CE]
+      tem[api-instance-template - TMP \n f1-micro]
+      tem-.->api1
+      tem-.->api2
+      tem-.->apin
+    end
+    subgraph MBR
+      mb[Message Broker Rabbit - CE]
+    end
+    subgraph SQL
+      db[Database \n PostgreSQL]
+    end
+    co[Converter - CE \n f1-micro]
+    subgraph GCS
+      gcs[bucket - GCS]
+    end
+    MIG<-->db
+    MIG --> mb
+    co<-->db
     mb<-->co
-    co-->db
+    co<--service agent-->gcs
+    MIG <--service agent-->gcs
+    co--api-->mail 
   end
 ```
 
@@ -48,20 +79,26 @@ flowchart TD
 
 A nivel de infraestructura
 
-| Componente     | Propósito                                                            |
-|----------------|----------------------------------------------------------------------|
-| Cliente        | Consume el servicio de conversión.                                   |
-| API            | Autentica, y despacha los servicios.                                 |
-| Converter      | Recibe solicitudes de conversión                                     |
-| NFS Server     | Provee carpeta común para transferir archivos entre converter y api  |
-| Message Broker | Cola de mensajería, por donde se despachan solicitudes de conversión |
-| Database       | Persistencia de usuarios, tasks, metadata de conversiones            |
+| Componente        | Propósito                                                                  |
+|-------------------|----------------------------------------------------------------------------|
+| Client            | Consume el servicio de conversión.                                         |
+| Load Balancer     | A través de una sola dirección ip, distribuye las peticiones hacia el API  |
+| Instance Group    | Gestiona las instancias de API de acuerdo a la carga                       |
+| Instance Template | Plantilla de instancias de APIs                                            |
+| API               | Autentica, y despacha los servicios.                                       |
+| Message Broker    | Cola de mensajería, por donde se despachan solicitudes de conversión       |
+| Converter         | Recibe solicitudes de conversión                                           |
+| Bucket            | Almacenamiento común de transferencia de archivos para converter y api     |
+| Database          | Persistencia de usuarios, tasks, metadata de conversiones                  |
+| Mail              | Servicio para el envío de email de notificación de conversión finalizada   |
 
-Nota: el alcance actual no incluye el desarrollo del cliente web, por lo cual en este alcance se usa Postman para simular las peticiones que realizaría el cliente web
+*Nota: el alcance actual no incluye el desarrollo del cliente web, por lo cual en este alcance se usa Postman para simular las peticiones que realizaría el cliente web*
 
 ### Tecnológica
 
-Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
+Se utiliza docker para orquestar el levantamiento de los componentes API, Message Broker Rabbit y Converter
+
+#### Tecnologías
 
 1. Postgres: motor de base de datos relacional.
 2. Flask: web framework.
@@ -70,7 +107,15 @@ Se utiliza docker para orquestar el levantamiento de los cuatro componentes.
 4. SqlAlchemy: ORM para la comunicación.
 5. uvicorn: HTTP <-> ASGI bridge para la comunicación del Flask.
 6. ffmpeg: convertidor de formatos de audio.
-7. nfs: network file system, transfiere archivos en la red.
+
+#### Servicios de Gooble Cloud Platform utilizados
+
+1. Load Balancer
+2. Managed Instance Group
+3. Compute Engine
+4. SQL
+5. Cloud Storage
+6. Monitoring
 
 ### Ejemplo de conversión
 
@@ -80,7 +125,7 @@ Este es el flujo normal que ocurre cuando un usuario crea una tarea de conversi�
 sequenceDiagram
   participant cli as Cliente Web
   participant api as API
-  participant nfs as NFS
+  participant gcs as Cloud Storage
   participant mb as Message Broker
   participant db as Database
   participant co as Converter
@@ -88,14 +133,14 @@ sequenceDiagram
   Note over cli,co: El usuario ya está autenticado
 
   cli->>api: Solicitud de conversión
-  api->>nfs: Almacena archivo
+  api->>gcs: Almacena archivo
   api->>db: Crear record de conversión
   api->>mb: Encola conversión
   api->>cli: Notifica conversión iniciada
   mb-->>co: Solicitud de conversión
-  co->>nfs: Retira archivo
+  co->>gcs: Retira archivo
   co->>co: Realiza conversión
-  co->>nfs: Almacena archivo convertido
+  co->>gcs: Almacena archivo convertido
   co->>db: Reporta resultado de conversión
   co-->>cli: Email al cliente con link de descarga
 ```
@@ -116,17 +161,19 @@ sequenceDiagram
 | `/benchmark/conversion/data`  | GET    | Obtiene cantidad de tareas procesadas por minuto |   |                                                                                                                                                                            |
 
 Información adicional en documentación del API en Postman en el siguiente link: [documentación API](https://documenter.getpostman.com/view/23989156/2s84LF4Gow), también puede usar [el archivo JSON que describe la API](./collections/Api.postman_collection.json)
-- Configurar environment con las siguientes variables:
-  - protocol: http
-  - host: \<\<IP_DE_LA_API\>\>
 
 ## Instrucciones Generales de despliegue
 
 Requerimientos:
   - Infraestructura:
-    - 4 Máquinas virtuales tipo N1 f1-micro para los servicios
+    - 1 balanceador de carga con protocolo http habilitado
+    - 2 máquinas virtuales tipo N1 f1-micro para los servicios converter y rabbitmq
       - Debian 11 (bullseye)
+    - 1 imagen de disco preconfigurado con base a api
+    - 1 plantilla de instancia configurada con la imagen de disco api
+    - 1 grupo de instancias administradas con base a la plantilla de instancia de api
     - 1 Instancia de cloud sql de desarrollo con Postgres 14
+    - 1 bucket de cloud storage 
 - Software a instalar
     - Git
     - Docker
@@ -138,7 +185,8 @@ Los siguientes pasos son iguales para todas las máquinas a instalar, **se supon
 
 - Se escogió el tipo correcto de instancia
 - **Las instancias comparten la misma red privada**
-- **Las instancias deben llamarse**: api, rabbitmq, converter, nfs
+- **Las instancias deben llamarse**: rabbitmq, converter
+- El grupo de instancias administrado debe llamarse: api-group
 - Las instancias tienen habilitado tráfico http (configuración al crearlas)
 - Su usuario es `maestria`, y su home directory es `/home/maestria`
 - Tiene acceso a root
@@ -161,16 +209,12 @@ git clone https://github.com/muniter/uni_cloud_convert.git
 cd uni_cloud_convert
 ```
 
-#### NFS
+#### Bucket en Cloud Storage
 
-**El NFS debe ser el primer componente en ser desplegado, para que el API y converter puedan montar el share**.
+1. Creación de bucket de tipo **standard** con nombre **miso-rad-cloud-convert**
+2. Configurar permisos de Service Agent y descargar archivo **service-account.json**
 
-1. Estando en la base del repositorio moverse a la carpeta [nfs](./nfs) y correr el script de startup.
-
-```bash
-cd uni_cloud_convert/nfs
-sudo ./startup.py
-```
+Puede seguir las [siguientes instrucciones](https://cloud.google.com/storage/docs/creating-buckets) para la creación
 
 #### Rabbit
 
@@ -191,20 +235,56 @@ Puede seguir las [siguientes instrucciones](https://cloud.google.com/sql/docs/po
 
 Si tiene algún problema en la configuración de Private IP pude seguir el [siguiente instructivo](https://cloud.google.com/sql/docs/postgres/configure-private-ip)
 
-#### API
+#### Instancias API dentro de un Managed Instance Group
+
+Crear una instancia de Compute Engine N1 f1-micro para configurar el API, luego se puede desactivar/eliminar
 
 1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
-1. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
-
+2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+```
+3. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
 ```bash
 cd uni_cloud_convert/services/api
 sudo ./startup.py
 ```
+4. A partir de la máquina de API preparada, generar una imagen de disco llamada **api-disk-image**
+5. Crear una plantilla de instancias llamada **api-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
+
+* configurar startup-script
+  ```bash
+  cd uni_cloud_convert/services/api
+  git pull
+  sudo docker compose up -d
+  ```
+6. Crear un grupo de instancias administradas con nombre **api-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
+
+  * Autoscaling: on
+  * Mínimo: 1 instancia
+  * Máximo: 3 instancias
+  * Métrica de autoscaling: CPU > 60%  * 
+
+#### Load Balancer
+
+1. Configurar balanceador de carga con nombre **web-map-http** direccionado el servicio de backend al grupo de instancias administradas **api-group** [ver paso a paso](https://cloud.google.com/iap/docs/load-balancer-howto?hl=es-419)
+2. Configurar un health check llamado **http-basic-check** con las siguientes características
+  * Path: /api-health
+  * Protocol: HTTP
+  * Port: 80
+  * Interval: 10 segs
+  * Timeout: 10 segs
+  * Healthy threshold (instancia saludable): 2 peticiones satisfactorias consecutivas
+  * Unhealthy threshold (instancia no saludable): 2 peticiones fallidas consecutivas
 
 #### Converter
 
 1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
-1. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
+2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+```
+3. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
 
 ```bash
 cd uni_cloud_convert/services/converter
@@ -226,6 +306,18 @@ curl $API_PUBLIC_IP/converter-health
 curl $API_PUBLIC_IP/ping
 ```
 
+### Probar el uso del servicio
+1. Instalar Postman localmente
+2. Configurar un environment con la IP pública asignada al Load Balancer
+3. Configurar los endpoints vistos previamente
+4. Deshabilitar variable de entorno `STRESS_TEST` en la máquina converter.
+    **NOTA: Antes de correr cualquier prueba no olvide habilitar el envío de correos, editando en el archivo [.env](./.env):**
+    ```bash
+    STRESS_TEST=0
+    ```
+5. Inicialmente usar **Signup** para crear usuario, y **Login** para iniciar sesión. tomar el token id y actualizarlo en los header/authorization de los servicios que lo requieren
+6. Probar el flujo de servicios deseado
+
 ### Comandos frecuentes
 ```bash
 # Rendimiento de la máquina virtual
@@ -244,7 +336,7 @@ sudo docker exec -it <<container_name>> bash
 # Análisis de Capacidad
 
 
-Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1).**
+Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1) y [la entrega de la segunda semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-2).**
 
 Se realizan pruebas de carga y estrés a la aplicación para lograr dimensionar la capacidad de la misma en un entorno de infraestructura definido. A continuación se describen las pruebas realizadas, los análisis de los resultados y las conclusiones sobre el rendimiento de la aplicación
 
@@ -307,21 +399,29 @@ STRESS_TEST=1
 
 ## Preámbulo
 
-### Hallazgos en ejecución en máquinas virtuales
-
-Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1).**
+### Hallazgos en ejecución en máquinas virtuales + escalamiento web
 
 - Incremento en nivel de complejidad: En el entorno de una sola máquina era solo usar un comando para levantar todo, ahora es necesario orquestar múltiples cosas.
 - La aplicación opera de forma satisfactoria con los diferentes servicios corriendo en su propia máquina.
+- El escalamiento horizontal de instancias **API** es un mecanismo eficiente para incrementar/reducir la capacidad de acuerdo a la carga eventual de peticiones
+- La sincronización entre el balanceador de carga y las instancias generadas por el Managed Instance Group es natural y eficiente
 
-#### Procesamiento CPU
+#### Procesamiento CPU (frente a la entrega anterior)
 
-- Pasamos de 2vCPU a 4 máquinas con 1vCPU c/u y se removió un servicio a PaaS (SQL).
-  - Sin embargo se redujo la capacidad de procesamiento tanto en el API como el converter que son los que más demandaban la CPU.
-  - Los componentes NFS, Database, y Rabbit no fueron afectados, debido a la baja demanda que hacemos a estos.
-  - Debido a que el convertidor pasó a solo tener 1vCPU hubo la necesidad de reducir el número de workers que celery invocaba de 5 a 1. La vCPU del sistema se bloqueaba completamente con la configuración anterior.
+- Reducción a 2 máquinas con 1vCPU c/u 
+  - rabbitmq: mantuvo sus características
+  - converter: mantuvo sus características (1 worker celery)
+- Generación variable de instancias de máquinas virtuales de API con 1vCPU c/u
+  - a través del Managed Instance Group se crean de una a tres instancias de API de acuerdo a la carga eventual, por lo cual la capacidad de procesamiento es dinámica dentro del rango
+- Database en Cloud SQL
+  - database: mantuvo sus características
+- Cambio de componente NFS a Cloud Storate estándar
+  - El acceso al servicio de Cloud Storage requiere un mecanismo más complejo de autenticación a través de un service-account
+  - La gestión de archivos con el bucket se realiza ya no como un directorio si no como servicio, generando requests get, put, delete. Este cambio traslada la gestión de la transferencia del archivo del sistema operativo a la aplicación a través de la librería storage de google.cloud en Python. Este cambio genera mayor consumo de CPU por request 
+- Componentes:
+  - Los componentes Database y Rabbit no fueron afectados, debido a la baja demanda que hacemos a estos
 - En general este sistema es principalmente bottlenecked por los recursos de CPU.
-- La introducción del sistema NFS afecta el aprovechamiento de recursos de CPU pues al python trabajar single threaded y blocking, se introducen considerables demoras al escribir un archivo a disco.
+- La introducción del sistema Cloud Storage afecta el aprovechamiento de recursos de CPU pues al python trabajar single threaded y blocking, se introducen considerables demoras al escribir un archivo.
 
 #### Memoria
 
@@ -331,10 +431,10 @@ Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](
 
 #### Almacenamiento
 
-- Pasamos de tener 30Gb de almacenamiento a 40Gb
+- Mantuvimos la capacidad de 40Gb
 - La imagen de Debian instalada en las máquinas estaba muy optimizada a ocupar poco espacio menos de 2Gb
   - Por lo cual los 8Gb de espacio restante por máquina fueron suficientes.
-- La introducción de NFS **introdujo inmensas latencias en la escritura a disco**.
+- La introducción de Cloud Storage **introdujo mayor latencia en la transferencia de red**.
 
 ## Escenarios del Plan de pruebas
 
@@ -387,48 +487,58 @@ Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-
 ```bash
 # Ser usuario root
 sudo su
+cd /home/maestria
 ```
 
 2. Iniciar locust
 
 ```bash
-# NOTA: reemplazar por la IP_DE_MAQUINA_VIRTUAL_APP
-locust --host=http://api --users=400 --spawn-rate=2 --web-port --autostart
+# NOTA: reemplazar por la ip asignada al balanceador de carga
+locust --host=http://<IP_LOAD_BALANCER> --users=400 --spawn-rate=2 --web-port --autostart
 ```
 
 3. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST` para ver la interfaz de locust podrá ver tab de **estadísticas, gráficas e instrucciones**.
 
 #### Resultados
 
-El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-1-2]
+##### Informe de resultados
 
-Nota: El informe de el ***despliegue local*** [se puede consultar aquí para comparación][@res-scenario-1-1]
+Se relacionan las diferentes entregas para detalle de la comparación realizada
+
+* GCP Autoscaling API: [Entrega 3][@res-scenario-1-3]
+* GCP PaaS: [Entrega 2][@res-scenario-1-2]
+* Local: [Entrega 1][@res-scenario-1-1]
 
 Estos son los puntos principales:
-- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 66 usuarios concurrentes, atendiendo a 6 request/segundo, esto es una disminución comparado al despliegue local que fueron 70 usuarios y 7.4 request/segundo.
-- El aplicativo es capaz de atender 360 request/minuto con archivos para conversión.
-- La curva de tiempo de respuesta es mucho más suavizada que el despliegue local, es más predecible. Esto lo atribuimos al hecho de que el convertidor no está compartiendo CPU con el API.
-- El aplicativo se satura fuertemente a los 86 usuarios concurrentes con una respuesta media de 4.1 segundos.
-- El aplicativo comienza a tener errores de timeout (request con más de 10 segundos de demora) con 146 usuarios concurrentes, a diferencia de local con 170 usuario.
+- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 35 usuarios concurrentes aproximadamente, atendiendo a 2.6 request/segundo, esto es una disminución comparado al despliegue local y PaaS que fueron 70 usuarios con 7.4 request/segundo y 56 usuarios con 6 requests/segundo respectivamente.
+- El aplicativo es capaz de atender 156 request/minuto con archivos para conversión.
+- La curva de tiempo de respuesta alcanza rápidamente tiempos altos de respuesta desde los 40 usuarios concurrentes y empieza a generar timeouts (requests con más de 10 segundos de espera) con 70 usuarios concurrentes
+- Con el autoescalamiento se observa que detiene y reduce levemente la curva de fallas por timeout, sin embargo, no es suficiente para atender la carga concurrente, por lo cual rápidamente vuelve a tener una tendencia creciente
+- Se observa que la velocidad que tardan las instancias del api en estar listas para atender peticiones no logra ser lo suficientemente rápida para lograr evitar timeouts. Cuando ya están arriba logran distribuir la carga y atender las nuevas peticiones, sin embargo rápidamente se ocupa su capacidad, generando nuevamente timeouts
+- El máximo de 3 instancias configuradas no son suficientes para atender la carga configurada en este escenario
 
 Cuadro comparativo:
 
-| Datos \ Ambiente                                         | Local         | GCP         |
-|----------------------------------------------------------|---------------|-------------|
-| RPS (<1500ms)                                            | 7.4s, 440/min | 6s, 360/min |
-| Usuarios (<1500ms)                                       | 70            | 56          |
-| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170           | 146         |
+| Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage |
+|----------------------------------------------------------|----------------|--------------|---------------------------------|
+| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   |
+| Usuarios (<1500ms)                                       | 70             | 56           | 35                              |
+| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              |
 
-Durante la operación en punto crítico esta era la utilización de recursos del API:
+Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
-> *obtenida con con el dashboard de GCP
+> *obtenida con el monitoring del Managed Instance Group de GCP
+![image](https://user-images.githubusercontent.com/98927955/201498855-ab794364-fad9-49d8-a5af-70d985ff99fa.png)
 
-![image](https://user-images.githubusercontent.com/9699804/198908130-33659f14-204a-46e4-8b99-759a884bac5a.png)
+> *obtenida con el dashboard configurado explícitamente en monitoring de GCP
+![image](https://user-images.githubusercontent.com/98927955/201498862-3f63d317-81ec-4fd6-907d-51bc43025047.png)
 
 A partir de esto:
-- El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU)
+- El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en el Managed Instance Group, que en este caso es del 180% (60% por cada instancia)
+- El parámetro de 60% por instancia se configuró para dar un periodo de creación de instancias cuando la primera instancia alcanza este umbral, ya que el tiempo de creación puede tardar hasta 60 segundos, sin embargo al reducirlo, reduce la capacidad esperada de las 3 instancias
+- La inclusión de Cloud Storage generó un mayor consumo de CPU para la autenticación y el envío de archivos a través del API de Cloud Storage. Al no cambiar las capacidades del API, redujo su desempeño por instancia
 - Durante un periodo de tiempo está usando más CPU de la que es asignada (esta es una propiedad de la máquina F1 asignada), el incremento y posterior estabilización de cantidad de CPU disponible lo vemos marcadamente con los incrementos en tiempo de respuesta.
-- El **API** esta **restringida** por recursos CPU.
+- El **API** esta **restringida** por recursos CPU asignados a cada instancia en particular y al máximo de instancias permitidas (max=3)
 
 ### 2. Capacidad de conversiones
 
@@ -445,9 +555,9 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (200).
-- El api genera los artefactos en base de datos y file system para las 200 tareas.
-- El api encola las 200 tareas rápidamente
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (60).
+- El api genera los artefactos en base de datos y file system para las 100 tareas.
+- El api encola las 60 tareas rápidamente
 - El convertidor desencola y convierte
 
 > Vista **simplificada del proceso**: aunque no estén dibujados en el diagrama todo está operando en conjunto, se encola, se guarda en db y el convertidor trabaja.
@@ -459,45 +569,46 @@ sequenceDiagram
   participant mb as Message Broker
   participant co as Converter
 
-  ben->>api: Solicita generar 200 conversiones
-  api->>api: Genera 200 conversiones
-  api->>mb: Encola 200 conversiones
-  api->>ben: Avisa que inició 200 conversiones
+  ben->>api: Solicita generar 100 conversiones
+  api->>api: Genera 100 conversiones
+  api->>mb: Encola 100 conversiones
+  api->>ben: Avisa que inició 100 conversiones
   mb-->>co: Solicitud de conversión
   co->>co: Conversión
 ```
 
-**Nota**: en este escenario fue necesario cambiar de 400 conversiones en la versión local, a 200 conversiones. Debido a que el tiempo que le tomaba al API copiar 400 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 246), debido a la latencia inducida por el nfs (synchronous file writing)
+**Nota**: en este escenario fue necesario cambiar de 200 conversiones en la versión GCP PaaS, a 60 conversiones. Debido a que el tiempo que le tomaba al API copiar 60 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 60 max), debido a la latencia inducida por el almacenamiento como servicio del Cloud Storage
 
 #### Resultados
+Se relacionan las diferentes entregas para detalle de la comparación realizada
 
-El informe de resultados [se puede ver en su totalidad en la siguiente página][@res-scenario-2-2]
+* GCP Autoscaling API: [Entrega 3][@res-scenario-2-3]
+* GCP PaaS: [Entrega 2][@res-scenario-2-2]
+* Local: [Entrega 1][@res-scenario-2-1]
 
-Nota: El informe de el ***despliegue local*** [se puede consultar aquí para comparación][@res-scenario-2-1]
+En esta prueba vimos un comportamiento similar al obtenido con GCP PaaS, sin embargo, la cantidad de trabajos lanzados al mismo tiempo si tuvo un decremento. Comparando métricas:
 
-En esta prueba vimos un decremento del 75% de rendimiento  en comparación a las pruebas locales, comparando métricas:
-
-| Datos \ Ambiente                                           | Local                | GCP              | 
-|------------------------------------------------------------|----------------------|------------------|
-| Promedio de archivos procesados por minuto                 | 18                   | 3                |
-| Máximo de archivos procesados por minuto                   | 20                   | 7                |
-| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              |
-| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              |
-| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               |
-| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos |
+| Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage |
+|------------------------------------------------------------|----------------------|------------------|---------------------------------|
+| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                               |
+| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7                               |
+| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             |
+| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60                             |
+| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28                              |
+| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos                |
 
 Esto lo atribuimos a:
-- Al ser una tarea CPU bound, la disminución de cores en número y capacidad hizo un gran impacto. Si hacemos una comparación inocente 1vCPU core de GCP equivale a 0.5 CPU core de la máquina virtual que probamos, por tanto el 25% de rendimiento.
-- El punto anterior se compenetra con la necesidad de cambiar la configuración de workers corriendo en el convertidor de 5 a 1, pues la máquina se bloqueaba completamente.
+- No hubo cambios a nivel de capacidades del componente converter, por lo cual se esperaba un resultado similar
+- La lectura de archivos desde el Cloud Storage no afectó el tiempo de procesamiento de cada tarea
+- Sin embargo, los aspectos de CPU y Cloud Storage mencionados en el escenario 1, afectaron la capacidad de lanzar gran cantidad de peticiones al mismo tiempo
 
 Ahora miremos el consumo de recursos converter:
 
 > *obtenida con con el dashboard de GCP
-
-![image](https://user-images.githubusercontent.com/9699804/198908433-ba4a5f0b-8d64-4eb8-9c75-c04f0581e5ea.png)
+![image](https://user-images.githubusercontent.com/98927955/201498871-7fe32012-cc91-4ea2-b891-ce8bb4f29461.png)
 
 - Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 7 archivos en el primer minuto, un poco más del doble del promedio.
-- Esta es una actividad completamente bottlenecked por la CPU por lo cual vemoz que no la deja descanasr en ningún momento.
+- Esta es una actividad completamente bottlenecked por la CPU por lo cual vemos que no la deja descansar en ningún momento.
 - El hecho de que siempre está saturada la CPU confirma que el solo utilizar 1 worker es la decisión correcta, al ser también un proceso 100% síncrono.
 
 
@@ -509,7 +620,7 @@ Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-
 2. Enviar el request para iniciar el benchmark
 
 ```bash
-curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=200 http://api/benchmark/conversion/start
+curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=60 http://api/benchmark/conversion/start
 ```
 
 ---
@@ -518,12 +629,12 @@ curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=200 http://api/bench
 3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
 
 ```bash
-http://$IP_DE_LA_API/benchmark/conversion/data
+http://$IP_DEL_BALANCEADOR/benchmark/conversion/data
 ```
 
-4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 400 peticiones
+4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 60 peticiones
 
-Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-1]
+Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
 
 
 ### Conclusiones y Limitaciones
@@ -531,12 +642,15 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-1]
 **Revisar análisis de resultados de cada escenario**:
 
 - Python y sus utilidades de transformación nos son ideales para actividades que están fuertemente restringidas por el uso de recursos (conversión de archivos).
-- La aplicación tiene como principal bottleneck la CPU para el converter y la api.
-- La introducción de NFS produce gran latencia para escribir el archivo por parte del api, y luego obtenerlo del lado del convertidor.
+- La aplicación tiene como principal bottleneck la CPU para el converter y las instancias de la api.
+- La introducción de Cloud Storage como servicio produce mayor latencia para escribir el archivo por parte del api, y no tanto impacto al obtenerlo del lado del convertidor.
 - El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
 - Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
 - El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
 - Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
+- El escalamiento horizontal de la API a través de un Managed Instance Group efectivamente brinda una mayor o menor capacidad del componente API en momentos de alta o baja carga, confirmando así los beneficios del autoscaling en capacidad, rendimiento y costo. Sin embargo, esta estrategia debe ir acompañada de un análisis más profundo que permita identificar cual es el tiempo óptimo en el que una instancia debería iniciar y que es posible alcanzar, cual es el porcentaje de cpu que debería disparar el escalamiento, cuantas instancias máximas serían las apropiadas para soportar la máxima carga esperada, y ajustes de arquitectura y diseño de la aplicación que permitan sacar mejor provecho del autoscaling
+- El uso de balanceador de carga facilitó la implementación y uso de la aplicación aún teniendo varias instancias de API, ya que el consumidor del API es transparente cuantas o cual instancia atiende la petición. Adicionalmente, las configuraciones de verificación de estado de salud de una instancia permite ajustar el comportamiento esperado de acuerdo a las reglas de negocio de la aplicación
+- La implementación de Cloud Storage brindó una alternativa de gestión de archivos y almacenamiento eficiente. El uso a través de servicios permite gestionar el bucket con esquemas robustos de seguridad, y desacoplado de los componentes de infraestructura en los que opera la aplicación. Sin embargo, el consumo de servicios y la gestión del ciclo de vida de la transferencia de cada archivo, generó mayor uso de cpu en las instancias del API, por lo cual su implementación debe ir acompañada de un análisis más profundo de arquitectura y diseño de la aplicación, de tal manera que se pueda sacar aún mejor provecho de Cloud Storage en aspectos como evitar la descarga de archivos a través del api si no con links directos a Cloud Storage de manera segura, o desacoplando la petición de conversión del almacenamiento en Cloud Storage, de tal manera que el api brinde respuestas rápidas al usuario, y gestione de manera más eficiente la transferencia de archivos al bucket
 
 
 <!-- links, leave at the end, this should be invisible -->
@@ -546,5 +660,7 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-1]
 [@muniter]: https://github.com/muniter
 [@res-scenario-1-1]: https://muniter.github.io/uni_cloud_convert/local_scenario_1
 [@res-scenario-1-2]: https://muniter.github.io/uni_cloud_convert/gcp_local_escenario_1
+[@res-scenario-1-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_1
 [@res-scenario-2-1]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/local_scenario_2.pdf
 [@res-scenario-2-2]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/gcp_local_escenario_2.pdf
+[@res-scenario-2-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_2.pdf
