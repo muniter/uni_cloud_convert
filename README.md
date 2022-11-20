@@ -28,7 +28,7 @@ Convención del diagrama:
 **LB**: Load Balancer  
 **MIG**: Managed Instance Group  
 **TMP**: Instance Template  
-**MBR**: Message Broker Rabbit  
+**PSU**: Google Cloud Pub/Sub  
 **GCS**: Google Cloud Storage  
 
 ```mermaid
@@ -55,23 +55,30 @@ flowchart TD
       tem-.->api2
       tem-.->apin
     end
-    subgraph MBR
-      mb[Message Broker Rabbit - CE]
-    end
+    PUBSUB[PSU Google Cloud Pub/Sub]
     subgraph SQL
       db[Database \n PostgreSQL]
     end
-    co[Converter - CE \n f1-micro]
+    subgraph MIGC[Managed Instance Group]
+      direction BT
+      co1[Converter instance 1 - CE]
+      co2[Converter instance 2 - CE]
+      con[Converter instance 3 - CE]
+      ctem[converter-instance-template - TMP \n f1-micro]
+      ctem-.->co1
+      ctem-.->co2
+      ctem-.->con
+    end
     subgraph GCS
       gcs[bucket - GCS]
     end
     MIG<-->db
-    MIG --> mb
-    co<-->db
-    mb<-->co
-    co<--service agent-->gcs
+    MIG -->PUBSUB
+    MIGC<-->db
+    PUBSUB<-->MIGC
+    MIGC<--service agent-->gcs
     MIG <--service agent-->gcs
-    co--api-->mail 
+    MIGC--api-->mail 
   end
 ```
 
@@ -79,36 +86,39 @@ flowchart TD
 
 A nivel de infraestructura
 
-| Componente        | Propósito                                                                  |
-|-------------------|----------------------------------------------------------------------------|
-| Client            | Consume el servicio de conversión.                                         |
-| Load Balancer     | A través de una sola dirección ip, distribuye las peticiones hacia el API  |
-| Instance Group    | Gestiona las instancias de API de acuerdo a la carga                       |
-| Instance Template | Plantilla de instancias de APIs                                            |
-| API               | Autentica, y despacha los servicios.                                       |
-| Message Broker    | Cola de mensajería, por donde se despachan solicitudes de conversión       |
-| Converter         | Recibe solicitudes de conversión                                           |
-| Bucket            | Almacenamiento común de transferencia de archivos para converter y api     |
-| Database          | Persistencia de usuarios, tasks, metadata de conversiones                  |
-| Mail              | Servicio para el envío de email de notificación de conversión finalizada   |
+| Componente        | Propósito                                                                 |
+|-------------------|---------------------------------------------------------------------------|
+| Client            | Consume el servicio de conversión.                                        |
+| Load Balancer     | A través de una sola dirección ip, distribuye las peticiones hacia el API |
+| Instance Group    | Gestiona las instancias de API de acuerdo a la carga                      |
+| Instance Template | Plantilla de instancias de APIs                                           |
+| API               | Autentica, y despacha los servicios.                                      |
+| Cloud Pub/Sub     | Servició de mensajería, por donde se despachan solicitudes de conversión  |
+| Converter         | Recibe solicitudes de conversión                                          |
+| Bucket            | Almacenamiento común de transferencia de archivos para converter y api    |
+| Database          | Persistencia de usuarios, tasks, metadata de conversiones                 |
+| Mail              | Servicio para el envío de email de notificación de conversión finalizada  |
 
 *Nota: el alcance actual no incluye el desarrollo del cliente web, por lo cual en este alcance se usa Postman para simular las peticiones que realizaría el cliente web*
 
 ### Tecnológica
 
-Se utiliza docker para orquestar el levantamiento de los componentes API, Message Broker Rabbit y Converter
+Se utiliza docker para orquestar el levantamiento de los componentes API y Converter
 
 #### Tecnologías
 
 1. Postgres: motor de base de datos relacional.
 2. Flask: web framework.
-3. Rabbit MQ: cola de mensajería
-3. Celery: framework que utiliza a Rabbit para implementar un job queue.
+3. Cloud Pub/Sub: sistema de mensajería asíncrona.
 4. SqlAlchemy: ORM para la comunicación.
 5. uvicorn: HTTP <-> ASGI bridge para la comunicación del Flask.
 6. ffmpeg: convertidor de formatos de audio.
+7. Google Cloud storage: Almaacenamiento de archivos.
+8. Load Balancer: balanceador de carga de peticiones HTTP.
+9. Managed Instance Group: orquestador de instancias de computo.
+10. Instance Template: plantilla de instancias de computo.
 
-#### Servicios de Gooble Cloud Platform utilizados
+#### Servicios de Google Cloud Platform utilizados
 
 1. Load Balancer
 2. Managed Instance Group
@@ -116,6 +126,7 @@ Se utiliza docker para orquestar el levantamiento de los componentes API, Messag
 4. SQL
 5. Cloud Storage
 6. Monitoring
+7. Pub/Sub
 
 ### Ejemplo de conversión
 
@@ -126,7 +137,7 @@ sequenceDiagram
   participant cli as Cliente Web
   participant api as API
   participant gcs as Cloud Storage
-  participant mb as Message Broker
+  participant psub as Cloud Pub/Sub
   participant db as Database
   participant co as Converter
 
@@ -135,9 +146,9 @@ sequenceDiagram
   cli->>api: Solicitud de conversión
   api->>gcs: Almacena archivo
   api->>db: Crear record de conversión
-  api->>mb: Encola conversión
+  api->>psub: Encola conversión
   api->>cli: Notifica conversión iniciada
-  mb-->>co: Solicitud de conversión
+  psub-->>co: Solicitud de conversión
   co->>gcs: Retira archivo
   co->>co: Realiza conversión
   co->>gcs: Almacena archivo convertido
@@ -146,6 +157,7 @@ sequenceDiagram
 ```
 
 ### Endpoints implementados
+
 | Endpoint                      | Método | Descipción                                     | Parámetros                                                                              | Consideraciones                                                                                                                                                                                                                               |
 |-------------------------------|--------|------------------------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/api/auth/signup`            | POST   | Creación de cuenta de usuario                  | <ul><li>username</li><li>password1</li><li>password2</li><li>email</li></ul>            | <ul><li>Usuario y correo electrónico son únicos en el sistema</li><li>Password entre 5 a 20 caracteres, debe contener al menos una minúscula, una mayúscula, un número, un caracter especial [$#@], y no tener espacios/tabs/saltos</li></ul> |
@@ -166,17 +178,21 @@ Información adicional en documentación del API en Postman en el siguiente link
 
 Requerimientos:
   - Infraestructura:
-    - 1 balanceador de carga con protocolo http habilitado
-    - 2 máquinas virtuales tipo N1 f1-micro para los servicios converter y rabbitmq
-      - Debian 11 (bullseye)
-    - 1 imagen de disco preconfigurado con base a api
+    - 1 balanceador de carga con protocolo http habilitado y funcionando en dos availability zone
+    - 1 imagen de disco pre-configurado con base a api
     - 1 plantilla de instancia configurada con la imagen de disco api
     - 1 grupo de instancias administradas con base a la plantilla de instancia de api
+    - 1 imagen de disco pre-configurado con base a converter
+    - 1 plantilla de instancia configurada con la imagen de disco converter
+    - 1 grupo de instancias administradas con base a la plantilla de instancia de converter
     - 1 Instancia de cloud sql de desarrollo con Postgres 14
-    - 1 bucket de cloud storage 
+    - 1 topic de pub/sub
+    - 1 subscription de pub/sub
+    - 1 bucket de cloud storage
 - Software a instalar
     - Git
     - Docker
+    - Python
 
 ### Instrucciones comunes
 
@@ -184,9 +200,9 @@ Los siguientes pasos son iguales para todas las máquinas a instalar, **se supon
 
 - Se escogió el tipo correcto de instancia
 - **Las instancias comparten la misma red privada**
-- **Las instancias deben llamarse**: rabbitmq, converter
-- El grupo de instancias administrado debe llamarse: api-group
+- El grupo de instancias api administrado debe llamarse: api-group
 - Las instancias tienen habilitado tráfico http (configuración al crearlas)
+- El grupo de instancias converter administrado debe llamarse: converter-group
 - Su usuario es `maestria`, y su home directory es `/home/maestria`
 - Tiene acceso a root
 
@@ -210,19 +226,17 @@ cd uni_cloud_convert
 
 #### Bucket en Cloud Storage
 
-1. Creación de bucket de tipo **standard** con nombre **miso-rad-cloud-convert**
-2. Configurar permisos de Service Agent y descargar archivo **service-account.json**
+1. Configurar permisos de Service Agent y descargar archivo **service-account.json**
+
+El servicio se encargará de crear el bucket si no existe a partir del nombre configurado en el archivo [.env](./.env)
 
 Puede seguir las [siguientes instrucciones](https://cloud.google.com/storage/docs/creating-buckets) para la creación
 
-#### Rabbit
+#### Cloud Pub/Sub
 
-1. Estando en la base del repositorio moverse a la carpeta [rabbit-mq](./rabbit-mq) y correr el script de startup.
+1. Habilitar el servicio de Cloud Pub/Sub
 
-```bash
-cd uni_cloud_convert/rabbit-mq
-sudo ./startup.py
-```
+El API hará el bootstrap de la creación de los recursos necesarios para el funcionamiento de la aplicación, por lo que no es necesario crearlos manualmente.
 
 #### Database
 
@@ -239,34 +253,39 @@ Si tiene algún problema en la configuración de Private IP pude seguir el [sigu
 Crear una instancia de Compute Engine N1 f1-micro para configurar el API, luego se puede desactivar/eliminar
 
 1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
+
 2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 ```
+
 3. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
 ```bash
 cd uni_cloud_convert/services/api
 sudo ./startup.py
 ```
 4. A partir de la máquina de API preparada, generar una imagen de disco llamada **api-disk-image**
+
 5. Crear una plantilla de instancias llamada **api-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
 
-* configurar startup-script
-  ```bash
-  cd uni_cloud_convert/services/api
-  git pull
-  sudo docker compose up -d
-  ```
-6. Crear un grupo de instancias administradas con nombre **api-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
+6. Configurar startup-script
+
+```bash
+cd uni_cloud_convert/services/converter
+git pull
+sudo docker compose up -d
+```
+
+7. Crear un grupo de instancias administradas con nombre **api-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
 
   * Autoscaling: on
   * Mínimo: 1 instancia
   * Máximo: 3 instancias
-  * Métrica de autoscaling: CPU > 60%  * 
+  * Métrica de autoscaling: CPU > 60%
 
 #### Load Balancer
 
-1. Configurar balanceador de carga con nombre **web-map-http** direccionado el servicio de backend al grupo de instancias administradas **api-group** [ver paso a paso](https://cloud.google.com/iap/docs/load-balancer-howto?hl=es-419)
+1. Configurar balanceador de carga con nombre **web-map-http** direccionado el servicio de backend al grupo de instancias administradas **api-group** [ver paso a paso](https://cloud.google.com/iap/docs/load-balancer-howto?hl=es-419), **desplegar en 2 zonas de disponibilidad**.
 2. Configurar un health check llamado **http-basic-check** con las siguientes características
   * Path: /api-health
   * Protocol: HTTP
@@ -278,17 +297,37 @@ sudo ./startup.py
 
 #### Converter
 
+Crear una instancia de Compute Engine N1 f1-micro para configurar el converter, luego se puede desactivar/eliminar
+
 1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
+
 2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 ```
 3. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
-
 ```bash
 cd uni_cloud_convert/services/converter
 sudo ./startup.py
 ```
+4. A partir de la máquina de converter preparada, generar una imagen de disco llamada **converter-disk-image**
+
+5. Crear una plantilla de instancias llamada **converter-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
+
+6. Configurar startup-script
+
+```bash
+cd uni_cloud_convert/services/converter
+git pull
+sudo docker compose up -d
+```
+
+7. Crear un grupo de instancias administradas con nombre **converter-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
+
+  * Autoscaling: on
+  * Mínimo: 1 instancia
+  * Máximo: 3 instancias
+  * Métrica de autoscaling: CPU > 60%
 
 ### Health Checks
 
