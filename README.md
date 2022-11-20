@@ -177,7 +177,6 @@ Requerimientos:
 - Software a instalar
     - Git
     - Docker
-    - nfs-commons: utilidades nfs
 
 ### Instrucciones comunes
 
@@ -194,7 +193,7 @@ Los siguientes pasos son iguales para todas las máquinas a instalar, **se supon
 1. Instalar dependencias:
 
 ```bash
-sudo apt update && sudo apt install git docker docker-compose nfs-common
+sudo apt update && sudo apt install git docker docker-compose
 ```
 
 2. Clonar el repositorio
@@ -415,7 +414,7 @@ STRESS_TEST=1
   - a través del Managed Instance Group se crean de una a tres instancias de API de acuerdo a la carga eventual, por lo cual la capacidad de procesamiento es dinámica dentro del rango
 - Database en Cloud SQL
   - database: mantuvo sus características
-- Cambio de componente NFS a Cloud Storate estándar
+- Cambio de componente NFS a Cloud Storage estándar
   - El acceso al servicio de Cloud Storage requiere un mecanismo más complejo de autenticación a través de un service-account
   - La gestión de archivos con el bucket se realiza ya no como un directorio si no como servicio, generando requests get, put, delete. Este cambio traslada la gestión de la transferencia del archivo del sistema operativo a la aplicación a través de la librería storage de google.cloud en Python. Este cambio genera mayor consumo de CPU por request 
 - Componentes:
