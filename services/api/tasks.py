@@ -12,7 +12,7 @@ from cloud import (
 from database import db_session
 from datetime import datetime
 from app import app
-from flask import request, send_file, jsonify
+from flask import request, send_file, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Task, User
 from pydantic import BaseModel
@@ -156,14 +156,17 @@ def get_converted_file(file_id: str):
     return send_file(file_path, as_attachment=True)
 
 
-def create_db_task(file, user_id, new_format, commit=True) -> tuple[Task, User]:
+def create_db_task(file, user_id, new_format, commit=True, filename=None) -> tuple[Task, User]:
+    filename = filename or file.filename
     file_id = str(uuid.uuid4())
-    file_extension = Path(file.filename).suffix.lstrip(".")
+    file_extension = Path(filename).suffix.lstrip(".")
     file_upload_name = f"{file_id}.{file_extension}"
     file_upload_path = Path("/tmp", file_upload_name)
 
     # Save, pass path to gcp and then delete local
-    file.save(str(file_upload_path))
+    with open(file_upload_path, "wb") as f:
+        f.write(file.read())
+
     file_size = os.stat(file_upload_path).st_size
     if file_size == 0:
         raise Exception("File is empty")
@@ -176,7 +179,7 @@ def create_db_task(file, user_id, new_format, commit=True) -> tuple[Task, User]:
         new_format=new_format,
         uploaded_filename=file_upload_name,
         file_id=file_id,
-        original_file=file.filename,
+        original_file=filename,
         original_format=file_extension,
         original_size=file_size,
     )
@@ -320,24 +323,36 @@ def benchmark_conversion():
     if not task_number:
         return {"message": "taskNumber value is not an allowed format"}, 400
 
-    for i in range(task_number):
-        file.seek(0)
-        app.logger.info(f"Creating task {i}")
-        task, _ = create_db_task(file, user_id, new_format, commit=False)
-        tasks.append(task)
+    response = Response(
+        json.dumps({"message": f"Creating {task_number} tasks"}),
+        status=200,
+        content_type="application/json",
+    )
+    filename = file.name
+    if filename is None:
+        return {"message": "file name not found"}, 400
 
-    now = datetime.utcnow()
-    for task in tasks:
-        task.uploaded_at = now  # pyright: ignore
+    file.save(Path("/tmp", filename))
 
-    db_session.add_all(tasks)
-    db_session.commit()
+    @response.call_on_close
+    def generate_tasks():
+        with open(Path("/tmp", filename), "rb") as file:
+            for i in range(task_number):
+                file.seek(0)
+                app.logger.info(f"Creating task {i}")
+                task, _ = create_db_task(file, user_id, new_format, commit=False, filename=filename)
+                tasks.append(task)
 
-    app.logger.info(f"Sending {task_number} task to conversion queue")
-    for task in tasks:
-        publish_task(task, user_email)
-    app.logger.info(f"Tasks {task_number} sent to conversion queue")
+            now = datetime.utcnow()
+            for task in tasks:
+                task.uploaded_at = now  # pyright: ignore
 
-    return {
-        "message": f"Starting benchmark with {task_number} tasks",
-    }, 200
+            db_session.add_all(tasks)
+            db_session.commit()
+
+            app.logger.info(f"Sending {task_number} task to conversion queue")
+            for task in tasks:
+                publish_task(task, user_email)
+            app.logger.info(f"Tasks {task_number} sent to conversion queue")
+
+    return response
