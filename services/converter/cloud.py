@@ -65,11 +65,24 @@ def initialize_subscription(callback=Callable):
         except AlreadyExists:
             logger.info(f"Subscription already exists: {subscription_path}")
 
-        future = subscriber.subscribe(subscription_path, callback=callback)
-        logger.info(f"Subscribed to {subscription_path}")
-        try:
-            future.result()
-            # Stop on keybard interrupt, and signals
-        except KeyboardInterrupt:
-            future.cancel()
-            logger.info("Received keyboard interrupt, stopping")
+        logger.info(f"Starting to pull messages from {subscription_path}")
+        while True:
+            try:
+                logger.info("Pulling messages")
+                response = subscriber.pull(
+                    request={"subscription": subscription_path, "max_messages": 1}
+                )
+                logger.info("Finished pulling, got %s messages", len(response.received_messages))
+                for received_message in response.received_messages:
+                    res = callback(received_message.message)
+                    if res is True:
+                        subscriber.acknowledge(
+                            request={
+                                "subscription": subscription_path,
+                                "ack_ids": [received_message.ack_id],
+                            }
+                        )
+                # Stop on keybard interrupt, and signals
+            except KeyboardInterrupt:
+                logger.info("Received keyboard interrupt, stopping")
+                exit(1)

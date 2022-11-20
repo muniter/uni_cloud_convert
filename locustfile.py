@@ -2,7 +2,7 @@ from locust import HttpUser, between, task
 import os
 
 headers = {
-    "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2NjIzNTY1NiwianRpIjoiMjgxOTU3MTEtMWY5Ny00MGU4LWE5ZDEtNTAwNTYwNDFiY2QwIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJqYXZpZXJsZyJ9LCJuYmYiOjE2NjYyMzU2NTZ9.Zw4GAS18j_NeVd5HMSo9f09Klmh6LC_N_AMx63fS2sg"
+    "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY2ODgxMDkwMywianRpIjoiYmZhNDNkZTItNjk5OC00NTcyLWFlZDEtZWU0OGUxZjkwNTlhIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9LCJuYmYiOjE2Njg4MTA5MDN9.BcYvQIQQBR1L6g0WFOPZm74kdvWWz_huhtOrNfWlpkg"
 }
 
 filename = "./sample.mp3"

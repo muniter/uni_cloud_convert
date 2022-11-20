@@ -29,10 +29,10 @@ def manager(message):
         else:
             logger.error(f"Unknown message type: {type}")
 
-        message.ack()
+        return True
     except Exception as e:
         logger.error(f"Error processing message: {e}, with data: {message_data}")
-        message.nack()
+        return False
 
 
 def db_health():
