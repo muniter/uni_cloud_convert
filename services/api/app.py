@@ -32,9 +32,16 @@ def init():
     initialize_bucket()
     app.logger.info("bucket initialized")
 
-    app.logger.info("Got the first request, initializing the database")
-    init_db()
-    app.logger.info("Database initialized")
+    app.logger.info("Got the first request, checking if the database is initialized")
+    # Check if the table tasks exists, if not, initialize the database
+    try:
+        db_session.execute("SELECT 1 FROM tasks LIMIT 1")
+        app.logger.info("Database is already initialized")
+    except Exception:
+        db_session.rollback()
+        app.logger.info("Database not initialized, initializing")
+        init_db()
+        app.logger.info("Database initialized")
 
 
 def get_pub_client():
