@@ -1,12 +1,21 @@
 from pathlib import Path
+from google.api_core.exceptions import AlreadyExists
 from google.cloud.storage.bucket import NotFound
-from google.cloud import storage
+from google.cloud import storage, pubsub_v1
 import os
 from app import app
 
 GCP_BUCKET_NAME = os.environ.get("GCP_BUCKET_NAME", None)
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", None)
+GCP_CONVERTER_TOPIC = os.environ.get("GCP_CONVERTER_TOPIC", None)
+
+# Validation
 if GCP_BUCKET_NAME is None:
     raise ValueError("GCP_BUCKET_NAME is not set")
+if GCP_PROJECT_ID is None:
+    raise ValueError("GCP_PROJECT_ID is not set")
+if GCP_CONVERTER_TOPIC is None:
+    raise ValueError("GCP_CONVERTER_TOPIC is not set")
 
 
 def initialize_bucket():
@@ -48,3 +57,20 @@ def delete_file(filename: str):
     except NotFound:
         app.logger.info(f"File {filename} not found in GCP")
     app.logger.info(f"Deleted file {filename} from GCP")
+
+
+def initialize_topic():
+    client, topic = get_publish_client()
+    try:
+        client.create_topic(name=topic)
+    except AlreadyExists as e:
+        app.logger.info(f"Topic {topic} already exists")
+    except Exception as e:
+        app.logger.info(
+            f"Failed to create topic {GCP_CONVERTER_TOPIC}, aborting. Exception: {e}"
+        )
+        exit(1)
+
+
+def get_publish_client():
+    return pubsub_v1.PublisherClient(), GCP_CONVERTER_TOPIC

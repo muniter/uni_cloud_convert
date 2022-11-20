@@ -13,12 +13,12 @@ services:
     env_file: ./.env
     depends_on:
       - database
-      - rabbitmq
     networks:
       - internal
 
   converter:
     container_name: converter
+    restart: always
     build:
       dockerfile: Dockerfile
       context: ./services/converter
@@ -28,19 +28,6 @@ services:
     env_file: ./.env
     depends_on:
       - database
-      - rabbitmq
-    networks:
-      - internal
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    ports:
-        # Management port
-        - 15672:15672
-    env_file: ./.env
-    volumes:
-      - ./rabbit-mq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     networks:
       - internal
 
@@ -58,7 +45,6 @@ services:
       - internal
     
 volumes:
-  rabbitmq-data:
   database-data:
 
 

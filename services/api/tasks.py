@@ -1,22 +1,40 @@
 import os
-from pathlib import Path, PurePath
+from pathlib import Path
 import json
 import uuid
 from sqlalchemy import select, and_
-from cloud import delete_file, get_file, put_file
+from cloud import (
+    delete_file,
+    get_file,
+    get_publish_client,
+    put_file,
+)
 from database import db_session
 from datetime import datetime
 from app import app
-from flask import request, send_file, Response, jsonify
+from flask import request, send_file, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Task, User
 from pydantic import BaseModel
 from flask_pydantic import validate
-from app import celery
 
 
 class TaskUpdateBody(BaseModel):
     newFormat: str
+
+
+def publish_task(task: Task, email):
+    args = {
+        "type": "convert",
+        "data": {
+            "file_id": task.file_id,
+            "uploaded_filename": task.uploaded_filename,
+            "new_format": task.new_format,
+            "email": email,
+        },
+    }
+    client, topic = get_publish_client()
+    client.publish(topic, data=json.dumps(args).encode())
 
 
 def task_serialize(task):
@@ -37,11 +55,10 @@ def task_serialize(task):
         "processed_at": task.processed_at.isoformat() if task.processed_at else None,
     }
 
+
 def data_serialize(row):
-  return {
-    "min": int(row.min),
-    "count": int(row.count)
-  }
+    return {"min": int(row.min), "count": int(row.count)}
+
 
 @app.route("/api/tasks", methods=["GET"])
 @jwt_required()
@@ -59,7 +76,7 @@ def get_tasks():
 def benchmark_conversion_result():
     tasks = db_session.execute(select([Task])).scalars().all()
     return [task_serialize(task) for task in tasks], 200
-  
+
 
 @app.route("/benchmark/conversion/data", methods=["GET"])
 def benchmark_conversion_data():
@@ -73,11 +90,11 @@ def benchmark_conversion_data():
                 FROM   tasks
                 WHERE  processed_at IS NOT NULL) AS d
         GROUP  BY d.diff
-        ORDER  BY min  
+        ORDER  BY min
         """
     )
     response = jsonify([data_serialize(row) for row in data])
-    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add("Access-Control-Allow-Origin", "*")
     return response
 
 
@@ -221,11 +238,7 @@ def create_task():
         task.new_format,
         task.original_file,
     )
-    celery.send_task(
-        "convert",
-        args=[task.file_id, task.uploaded_filename, task.new_format, user.email],
-    )
-
+    publish_task(task, user.email)
     return {"message": "task created", "task": task_serialize(task)}, 200
 
 
@@ -271,10 +284,7 @@ def update_task(task_id: int, body: TaskUpdateBody):
     db_session.commit()
 
     app.logger.info("Sending task to convert")
-    celery.send_task(
-        "convert",
-        args=[task.file_id, task.uploaded_filename, task.new_format, user.email],
-    )
+    publish_task(task, user.email)
 
     return {"message": "task updated", "task": task_serialize(task)}, 200
 
@@ -325,15 +335,7 @@ def benchmark_conversion():
 
     app.logger.info(f"Sending {task_number} task to conversion queue")
     for task in tasks:
-        celery.send_task(
-            "convert",
-            args=[
-                task.file_id,
-                task.uploaded_filename,
-                task.new_format,
-                user_email,
-            ],
-        )
+        publish_task(task, user_email)
     app.logger.info(f"Tasks {task_number} sent to conversion queue")
 
     return {
