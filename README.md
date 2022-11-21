@@ -90,7 +90,7 @@ A nivel de infraestructura
 |-------------------|---------------------------------------------------------------------------|
 | Client            | Consume el servicio de conversión.                                        |
 | Load Balancer     | A través de una sola dirección ip, distribuye las peticiones hacia el API |
-| Instance Group    | Gestiona las instancias de API de acuerdo a la carga                      |
+| Manage Instance Group    | Gestiona las instancias de tanto de la API y del converter                     |
 | Instance Template | Plantilla de instancias de APIs                                           |
 | API               | Autentica, y despacha los servicios.                                      |
 | Cloud Pub/Sub     | Servició de mensajería, por donde se despachan solicitudes de conversión  |
@@ -238,6 +238,11 @@ Puede seguir las [siguientes instrucciones](https://cloud.google.com/storage/doc
 
 El API hará el bootstrap de la creación de los recursos necesarios para el funcionamiento de la aplicación, por lo que no es necesario crearlos manualmente.
 
+Tomar en cuenta que para este proyecto por la lógica de negocio se debe activar la siguiente configuración en la _Subscripción_:
+
+- **Acknowledge deadline**: 1 min
+- **Exactly once delivery**: Enabled
+
 #### Database
 
 Crear la instancia en Cloud-SQL de Postgres.
@@ -261,7 +266,7 @@ GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 
 3. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
 ```bash
-cd uni_cloud_convert/services/api
+cd /home/maestria/uni_cloud_convert/services/api
 sudo ./startup.py
 ```
 4. A partir de la máquina de API preparada, generar una imagen de disco llamada **api-disk-image**
@@ -271,13 +276,14 @@ sudo ./startup.py
 6. Configurar startup-script
 
 ```bash
-cd uni_cloud_convert/services/converter
-git pull
+cd /home/maestria/uni_cloud_convert/services/converter
+sudo git pull
 sudo docker compose up -d
 ```
 
 7. Crear un grupo de instancias administradas con nombre **api-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
-
+  
+  * Ubicación: Varias zonas (Elegir dos zonas dentro de la misma región)
   * Autoscaling: on
   * Mínimo: 1 instancia
   * Máximo: 3 instancias
@@ -295,7 +301,7 @@ sudo docker compose up -d
   * Healthy threshold (instancia saludable): 2 peticiones satisfactorias consecutivas
   * Unhealthy threshold (instancia no saludable): 2 peticiones fallidas consecutivas
 
-#### Converter
+#### Instancias de Converter dentro de un Manage Instance Group
 
 Crear una instancia de Compute Engine N1 f1-micro para configurar el converter, luego se puede desactivar/eliminar
 
@@ -305,29 +311,32 @@ Crear una instancia de Compute Engine N1 f1-micro para configurar el converter, 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 ```
+
 3. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
 ```bash
-cd uni_cloud_convert/services/converter
+cd /home/maestria/uni_cloud_convert/services/converter
 sudo ./startup.py
 ```
-4. A partir de la máquina de converter preparada, generar una imagen de disco llamada **converter-disk-image**
+4. A partir de la máquina de API preparada, generar una imagen de disco llamada **converter-disk-image**
 
 5. Crear una plantilla de instancias llamada **converter-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
 
 6. Configurar startup-script
 
 ```bash
-cd uni_cloud_convert/services/converter
-git pull
+cd /home/maestria/uni_cloud_convert/services/converter
+sudo git pull
 sudo docker compose up -d
 ```
 
 7. Crear un grupo de instancias administradas con nombre **converter-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
-
+   
+  * Ubicación: Varias zonas (Elegir dos zonas dentro de la misma región)
   * Autoscaling: on
   * Mínimo: 1 instancia
   * Máximo: 3 instancias
-  * Métrica de autoscaling: CPU > 60%
+  * Forma de distribución objetivo:  Uniforme
+  * Métrica de autoscaling: 3 mensajes en la cola de mensajes.
 
 ### Health Checks
 
@@ -437,33 +446,31 @@ STRESS_TEST=1
 
 ## Preámbulo
 
-### Hallazgos en ejecución en máquinas virtuales + escalamiento web
+### Hallazgos en ejecución en máquinas virtuales, escalamiento tanto en la capa web como en el worker
 
 - Incremento en nivel de complejidad: En el entorno de una sola máquina era solo usar un comando para levantar todo, ahora es necesario orquestar múltiples cosas.
 - La aplicación opera de forma satisfactoria con los diferentes servicios corriendo en su propia máquina.
 - El escalamiento horizontal de instancias **API** es un mecanismo eficiente para incrementar/reducir la capacidad de acuerdo a la carga eventual de peticiones
-- La sincronización entre el balanceador de carga y las instancias generadas por el Managed Instance Group es natural y eficiente
+- La sincronización entre el balanceador de carga y las instancias generadas por el Managed Instance Group es natural y eficiente.
+- El escalamiento horizontal del converter si bien se podría hacer en base del uso del CPU de las instancias, la métrrica recomendada a usar es el número de mensajes en cola.
+- El Cloud Pub/Sub viene configurado por defecto con la operación de push y de acuerdo a las necesidades de este proyecto se requirió hacer cambios en el converter para hacer pull de los mensajes.
 
 #### Procesamiento CPU (frente a la entrega anterior)
 
-- Reducción a 2 máquinas con 1vCPU c/u 
-  - rabbitmq: mantuvo sus características
-  - converter: mantuvo sus características (1 worker celery)
-- Generación variable de instancias de máquinas virtuales de API con 1vCPU c/u
-  - a través del Managed Instance Group se crean de una a tres instancias de API de acuerdo a la carga eventual, por lo cual la capacidad de procesamiento es dinámica dentro del rango
+- Se necesitó pasar de usar RabbitMQ y Celery a un servicio de mensajería provisto por Google, llamando Cloud Pub/Sub
+- Generación variable de instancias de máquinas virtuales de API y de converter con 1vCPU c/u
+  - a través del Managed Instance Group se crean de una a tres instancias de API y del worker de acuerdo a la carga eventual y al número de mensajes encolados en el caso del worker, por lo cual la capacidad de procesamiento es dinámica dentro del rango
 - Database en Cloud SQL
   - database: mantuvo sus características
-- Cambio de componente NFS a Cloud Storage estándar
-  - El acceso al servicio de Cloud Storage requiere un mecanismo más complejo de autenticación a través de un service-account
+- Se mantiene el uso de Cloud Storage estándar
+  - El acceso al servicio de Cloud Storage requiere un mecanismo más complejo de autenticación a través de un service-account, respecto a otras tecnologías como NFS usadas en las primeras entregas
   - La gestión de archivos con el bucket se realiza ya no como un directorio si no como servicio, generando requests get, put, delete. Este cambio traslada la gestión de la transferencia del archivo del sistema operativo a la aplicación a través de la librería storage de google.cloud en Python. Este cambio genera mayor consumo de CPU por request 
 - Componentes:
-  - Los componentes Database y Rabbit no fueron afectados, debido a la baja demanda que hacemos a estos
-- En general este sistema es principalmente bottlenecked por los recursos de CPU.
-- La introducción del sistema Cloud Storage afecta el aprovechamiento de recursos de CPU pues al python trabajar single threaded y blocking, se introducen considerables demoras al escribir un archivo.
+  - Los componentes requirieron una modificación no extensa pero si a tomar en cuenta para la integración del nuevo servicio de mensajería.
 
 #### Memoria
 
-- Pasamos de 2Gb a 2.4Gb de memoria distribuido.
+- 2.4Gb de memoria distribuido.
   - Esta cantidad de memoria es suficiente para el uso de la aplicación, no presentó problemas.
   - Debido a que el converter está invocando un programa escrito eficiente `ffmpeg` escrito en C, la capacidad de memoria es suficiente.
 
@@ -548,20 +555,23 @@ Se relacionan las diferentes entregas para detalle de la comparación realizada
 * Local: [Entrega 1][@res-scenario-1-1]
 
 Estos son los puntos principales:
-- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 35 usuarios concurrentes aproximadamente, atendiendo a 2.6 request/segundo, esto es una disminución comparado al despliegue local y PaaS que fueron 70 usuarios con 7.4 request/segundo y 56 usuarios con 6 requests/segundo respectivamente.
-- El aplicativo es capaz de atender 156 request/minuto con archivos para conversión.
-- La curva de tiempo de respuesta alcanza rápidamente tiempos altos de respuesta desde los 40 usuarios concurrentes y empieza a generar timeouts (requests con más de 10 segundos de espera) con 70 usuarios concurrentes
-- Con el autoescalamiento se observa que detiene y reduce levemente la curva de fallas por timeout, sin embargo, no es suficiente para atender la carga concurrente, por lo cual rápidamente vuelve a tener una tendencia creciente
+
+- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 40 usuarios concurrentes aproximadamente, atendiendo a 3.7 request/segundo, esto es un incremento comparado al despliegue de la entrega anterior donde el aplicativo era capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 35 usuarios concurrentes aproximadamente, atendiendo a 2.6 request/segundo
+
+- El aplicativo es capaz de atender 222 request/minuto con archivos para conversión.
+  
+- La curva de tiempo de respuesta alcanza rápidamente tiempos altos de respuesta desde los 24 usuarios concurrentes y empieza a generar timeouts (requests con más de 10 segundos de espera) con 114 usuarios concurrentes
+- Con el autoescalamiento se observa que detiene y reduce levemente la curva de fallas por timeout, sin embargo, no es suficiente para atender la carga concurrente, por lo cual rápidamente vuelve a tener una tendencia creciente, un comportamiento que se evidenció en el despliegue anterior
 - Se observa que la velocidad que tardan las instancias del api en estar listas para atender peticiones no logra ser lo suficientemente rápida para lograr evitar timeouts. Cuando ya están arriba logran distribuir la carga y atender las nuevas peticiones, sin embargo rápidamente se ocupa su capacidad, generando nuevamente timeouts
-- El máximo de 3 instancias configuradas no son suficientes para atender la carga configurada en este escenario
+- El máximo de 3 instancias del grupo worker y API configuradas sumadas a un nuevo servicio de mensajer'ia no son suficientes para atender la carga configurada en este escenario, sin embargo se nota una mejora respecto al anterior despliegue.
 
 Cuadro comparativo:
 
-| Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage |
-|----------------------------------------------------------|----------------|--------------|---------------------------------|
-| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   |
-| Usuarios (<1500ms)                                       | 70             | 56           | 35                              |
-| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              |
+| Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
+|----------------------------------------------------------|----------------|--------------|---------------------------------|---|
+| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   | 3.7/s, 222/min|
+| Usuarios (<1500ms)                                       | 70             | 56           | 35                              | 40     |
+| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              |     114   |
 
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
@@ -578,6 +588,8 @@ A partir de esto:
 - Durante un periodo de tiempo está usando más CPU de la que es asignada (esta es una propiedad de la máquina F1 asignada), el incremento y posterior estabilización de cantidad de CPU disponible lo vemos marcadamente con los incrementos en tiempo de respuesta.
 - El **API** esta **restringida** por recursos CPU asignados a cada instancia en particular y al máximo de instancias permitidas (max=3)
 
+
+
 ### 2. Capacidad de conversiones
 
 Máxima cantidad de archivos procesables por minuto.
@@ -593,9 +605,9 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (60).
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (50).
 - El api genera los artefactos en base de datos y file system para las 100 tareas.
-- El api encola las 60 tareas rápidamente
+- El api encola las 50 tareas rápidamente
 - El convertidor desencola y convierte
 
 > Vista **simplificada del proceso**: aunque no estén dibujados en el diagrama todo está operando en conjunto, se encola, se guarda en db y el convertidor trabaja.
@@ -615,7 +627,7 @@ sequenceDiagram
   co->>co: Conversión
 ```
 
-**Nota**: en este escenario fue necesario cambiar de 200 conversiones en la versión GCP PaaS, a 60 conversiones. Debido a que el tiempo que le tomaba al API copiar 60 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 60 max), debido a la latencia inducida por el almacenamiento como servicio del Cloud Storage
+**Nota**: en este escenario fue necesario cambiar de 200 conversiones en la versión GCP PaaS, a 50 conversiones. Debido a que el tiempo que le tomaba al API copiar 50 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 50 max), debido a la latencia inducida por el almacenamiento como servicio del Cloud Storage
 
 #### Resultados
 Se relacionan las diferentes entregas para detalle de la comparación realizada
@@ -626,19 +638,19 @@ Se relacionan las diferentes entregas para detalle de la comparación realizada
 
 En esta prueba vimos un comportamiento similar al obtenido con GCP PaaS, sin embargo, la cantidad de trabajos lanzados al mismo tiempo si tuvo un decremento. Comparando métricas:
 
-| Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage |
-|------------------------------------------------------------|----------------------|------------------|---------------------------------|
-| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                               |
-| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7                               |
-| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             |
-| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60                             |
-| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28                              |
-| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos                |
+| Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
+|------------------------------------------------------------|----------------------|------------------|---------------------------------|---------|
+| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                |   8    |
+| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7             |    10   |
+| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             |   8-10    |
+| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60         |    50   |
+| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28    |    81   |
+| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos       |   172 en 22 minutos   |
 
 Esto lo atribuimos a:
-- No hubo cambios a nivel de capacidades del componente converter, por lo cual se esperaba un resultado similar
+- Los cambios a nivel de capacidades del componente converter, lograron casi triplicar la capacidad de conversión
 - La lectura de archivos desde el Cloud Storage no afectó el tiempo de procesamiento de cada tarea
-- Sin embargo, los aspectos de CPU y Cloud Storage mencionados en el escenario 1, afectaron la capacidad de lanzar gran cantidad de peticiones al mismo tiempo
+- Sin embargo, los aspectos de CPU y Cloud Storage mencionados en el escenario 1, afectaron la capacidad de lanzar gran cantidad de peticiones al mismo tiempo, en este caso se ejecutó dentro de un loop estas peticiones
 
 Ahora miremos el consumo de recursos converter:
 
@@ -681,14 +693,15 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
 
 - Python y sus utilidades de transformación nos son ideales para actividades que están fuertemente restringidas por el uso de recursos (conversión de archivos).
 - La aplicación tiene como principal bottleneck la CPU para el converter y las instancias de la api.
-- La introducción de Cloud Storage como servicio produce mayor latencia para escribir el archivo por parte del api, y no tanto impacto al obtenerlo del lado del convertidor.
+- Mantener Cloud Storage como servicio produce mayor latencia para escribir el archivo por parte del api, y no tanto impacto al obtenerlo del lado del convertidor.
 - El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
 - Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
 - El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
 - Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
 - El escalamiento horizontal de la API a través de un Managed Instance Group efectivamente brinda una mayor o menor capacidad del componente API en momentos de alta o baja carga, confirmando así los beneficios del autoscaling en capacidad, rendimiento y costo. Sin embargo, esta estrategia debe ir acompañada de un análisis más profundo que permita identificar cual es el tiempo óptimo en el que una instancia debería iniciar y que es posible alcanzar, cual es el porcentaje de cpu que debería disparar el escalamiento, cuantas instancias máximas serían las apropiadas para soportar la máxima carga esperada, y ajustes de arquitectura y diseño de la aplicación que permitan sacar mejor provecho del autoscaling
 - El uso de balanceador de carga facilitó la implementación y uso de la aplicación aún teniendo varias instancias de API, ya que el consumidor del API es transparente cuantas o cual instancia atiende la petición. Adicionalmente, las configuraciones de verificación de estado de salud de una instancia permite ajustar el comportamiento esperado de acuerdo a las reglas de negocio de la aplicación
-- La implementación de Cloud Storage brindó una alternativa de gestión de archivos y almacenamiento eficiente. El uso a través de servicios permite gestionar el bucket con esquemas robustos de seguridad, y desacoplado de los componentes de infraestructura en los que opera la aplicación. Sin embargo, el consumo de servicios y la gestión del ciclo de vida de la transferencia de cada archivo, generó mayor uso de cpu en las instancias del API, por lo cual su implementación debe ir acompañada de un análisis más profundo de arquitectura y diseño de la aplicación, de tal manera que se pueda sacar aún mejor provecho de Cloud Storage en aspectos como evitar la descarga de archivos a través del api si no con links directos a Cloud Storage de manera segura, o desacoplando la petición de conversión del almacenamiento en Cloud Storage, de tal manera que el api brinde respuestas rápidas al usuario, y gestione de manera más eficiente la transferencia de archivos al bucket
+- Cloud Storage brindó una alternativa de gestión de archivos y almacenamiento eficiente. El uso a través de servicios permite gestionar el bucket con esquemas robustos de seguridad, y desacoplado de los componentes de infraestructura en los que opera la aplicación. Sin embargo, el consumo de servicios y la gestión del ciclo de vida de la transferencia de cada archivo, generó mayor uso de cpu en las instancias del API, por lo cual su implementación debe ir acompañada de un análisis más profundo de arquitectura y diseño de la aplicación, de tal manera que se pueda sacar aún mejor provecho de Cloud Storage en aspectos como evitar la descarga de archivos a través del api si no con links directos a Cloud Storage de manera segura, o desacoplando la petición de conversión del almacenamiento en Cloud Storage, de tal manera que el api brinde respuestas rápidas al usuario, y gestione de manera más eficiente la transferencia de archivos al bucket
+- El escalamiento horizontal de la capa worker a través de un Manage Instance group ha incrementado evidentemente el número de archivos convertidos por el aplicativo.
 
 
 <!-- links, leave at the end, this should be invisible -->
