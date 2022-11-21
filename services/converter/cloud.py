@@ -59,7 +59,12 @@ def initialize_subscription(callback=Callable):
         try:
             logger.info(f"Creating subscription: {subscription_path}")
             subscriber.create_subscription(
-                request={"name": subscription_path, "topic": GCP_CONVERTER_TOPIC}
+                request={
+                    "name": subscription_path,
+                    "topic": GCP_CONVERTER_TOPIC,
+                    "ack_deadline_seconds": 60,
+                    "enable_exactly_once_delivery": True,
+                }
             )
             logger.info(f"Created subscription: {subscription_path}")
         except AlreadyExists:
@@ -72,7 +77,9 @@ def initialize_subscription(callback=Callable):
                 response = subscriber.pull(
                     request={"subscription": subscription_path, "max_messages": 1}
                 )
-                logger.info("Finished pulling, got %s messages", len(response.received_messages))
+                logger.info(
+                    "Finished pulling, got %s messages", len(response.received_messages)
+                )
                 for received_message in response.received_messages:
                     res = callback(received_message.message)
                     if res is True:
