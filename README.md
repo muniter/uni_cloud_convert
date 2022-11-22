@@ -568,10 +568,10 @@ Estos son los puntos principales:
 Cuadro comparativo:
 
 | Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
-|----------------------------------------------------------|----------------|--------------|---------------------------------|---|
-| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   | 3.7/s, 222/min|
-| Usuarios (<1500ms)                                       | 70             | 56           | 35                              | 40     |
-| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              |     114   |
+|----------------------------------------------------------|----------------|--------------|---------------------------------|------------------------------------|
+| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   | 3.7/s, 222/min                     |
+| Usuarios (<1500ms)                                       | 70             | 56           | 35                              | 44                                 |
+| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              | 114                                |
 
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
@@ -605,9 +605,9 @@ Limitantes:
 
 La prueba se realiza enviando un request a un endpoint especial `/benchmark/conversion/start` con un archivo de 5MB, el formato esperado y el número de tareas a ejecutar. El proceso funciona de la siguiente manera:
 
-- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (50).
-- El api genera los artefactos en base de datos y file system para las 100 tareas.
-- El api encola las 50 tareas rápidamente
+- El usuario benchmark (tú) hace el llamado a la api para iniciar el benchmark con un archivo (mp3 de 5MB), nuevo formato (wav) y número de tareas (200) distribuidas en 4 peticiones consecutivas de (50) en cada petición.
+- El api genera los artefactos en base de datos y file system para las 200 tareas.
+- El api encola las 200 tareas rápidamente
 - El convertidor desencola y convierte
 
 > Vista **simplificada del proceso**: aunque no estén dibujados en el diagrama todo está operando en conjunto, se encola, se guarda en db y el convertidor trabaja.
@@ -619,15 +619,15 @@ sequenceDiagram
   participant mb as Message Broker
   participant co as Converter
 
-  ben->>api: Solicita generar 100 conversiones
-  api->>api: Genera 100 conversiones
-  api->>mb: Encola 100 conversiones
-  api->>ben: Avisa que inició 100 conversiones
+  ben->>api: Solicita generar 200 conversiones
+  api->>api: Genera 200 conversiones
+  api->>mb: Encola 200 conversiones
+  api->>ben: Avisa que inició 200 conversiones
   mb-->>co: Solicitud de conversión
   co->>co: Conversión
 ```
 
-**Nota**: en este escenario fue necesario cambiar de 200 conversiones en la versión GCP PaaS, a 50 conversiones. Debido a que el tiempo que le tomaba al API copiar 50 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 50 max), debido a la latencia inducida por el almacenamiento como servicio del Cloud Storage
+**Nota**: en este escenario fue necesario lanzar 4 peticiones de 50 conversiones c/una para generar las 200 peticiones, debido a que el tiempo que le tomaba al API copiar 50 archivos excedía el timeout de Flask ('[CRITICAL] WORKER TIMEOUT', alcanzaba a 50 max), debido a la latencia inducida por el almacenamiento como servicio del Cloud Storage
 
 #### Resultados
 Se relacionan las diferentes entregas para detalle de la comparación realizada
@@ -636,16 +636,16 @@ Se relacionan las diferentes entregas para detalle de la comparación realizada
 * GCP PaaS: [Entrega 2][@res-scenario-2-2]
 * Local: [Entrega 1][@res-scenario-2-1]
 
-En esta prueba vimos un comportamiento similar al obtenido con GCP PaaS, sin embargo, la cantidad de trabajos lanzados al mismo tiempo si tuvo un decremento. Comparando métricas:
+En esta prueba vimos un comportamiento similar al obtenido con GCP Autoscaling API, sin embargo, la cantidad de trabajos lanzados al mismo tiempo si tuvo un incremento. Comparando métricas:
 
 | Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
-|------------------------------------------------------------|----------------------|------------------|---------------------------------|---------|
-| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                |   8    |
-| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7             |    10   |
-| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             |   8-10    |
-| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60         |    50   |
-| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28    |    81   |
-| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos       |   172 en 22 minutos   |
+|------------------------------------------------------------|----------------------|------------------|---------------------------------|-------------------|
+| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                               | 8                 |
+| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7                               | 10                |
+| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             | 7-8               |
+| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60                              | 50                |
+| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28                              | 81                |
+| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos                | 200 en 26 minutos |
 
 Esto lo atribuimos a:
 - Los cambios a nivel de capacidades del componente converter, lograron casi triplicar la capacidad de conversión
@@ -670,7 +670,8 @@ Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-
 2. Enviar el request para iniciar el benchmark
 
 ```bash
-curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=60 http://api/benchmark/conversion/start
+cd /home/maestria/
+for var in {1..4}; do curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=50 http://<IP_BALANCEADOR_CARGA>/benchmark/conversion/start; sleep 30; done
 ```
 
 ---
@@ -712,6 +713,8 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
 [@res-scenario-1-1]: https://muniter.github.io/uni_cloud_convert/local_scenario_1
 [@res-scenario-1-2]: https://muniter.github.io/uni_cloud_convert/gcp_local_escenario_1
 [@res-scenario-1-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_1
+[@res-scenario-1-4]: https://muniter.github.io/uni_cloud_convert/Alta_disponibilidad_escenario_1.html
 [@res-scenario-2-1]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/local_scenario_2.pdf
 [@res-scenario-2-2]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/gcp_local_escenario_2.pdf
 [@res-scenario-2-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_2.pdf
+[@res-scenario-2-4]: https://muniter.github.io/uni_cloud_convert/Alta_disponibilidad_escenario_2.pdf
