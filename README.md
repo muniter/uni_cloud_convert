@@ -550,6 +550,7 @@ locust --host=http://<IP_LOAD_BALANCER> --users=400 --spawn-rate=2 --web-port --
 
 Se relacionan las diferentes entregas para detalle de la comparación realizada
 
+* GCP Autoscaling Converter + Cloud Pub/Sub: [Entrega 4][@res-scenario-1-4]
 * GCP Autoscaling API: [Entrega 3][@res-scenario-1-3]
 * GCP PaaS: [Entrega 2][@res-scenario-1-2]
 * Local: [Entrega 1][@res-scenario-1-1]
@@ -632,6 +633,7 @@ sequenceDiagram
 #### Resultados
 Se relacionan las diferentes entregas para detalle de la comparación realizada
 
+* GCP Autoscaling Converter + Cloud Pub/Sub: [Entrega 4][@res-scenario-2-4]
 * GCP Autoscaling API: [Entrega 3][@res-scenario-2-3]
 * GCP PaaS: [Entrega 2][@res-scenario-2-2]
 * Local: [Entrega 1][@res-scenario-2-1]
