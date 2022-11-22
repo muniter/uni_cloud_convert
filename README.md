@@ -576,10 +576,10 @@ Cuadro comparativo:
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
 > *obtenida con el monitoring del Managed Instance Group de GCP
-![image](https://user-images.githubusercontent.com/98927955/201498855-ab794364-fad9-49d8-a5af-70d985ff99fa.png)
+![image](https://user-images.githubusercontent.com/98927955/203191201-9179c6bc-208c-43bd-9f36-11ddf0de415a.png)
 
 > *obtenida con el dashboard configurado explícitamente en monitoring de GCP
-![image](https://user-images.githubusercontent.com/98927955/201498862-3f63d317-81ec-4fd6-907d-51bc43025047.png)
+![image](https://user-images.githubusercontent.com/98927955/203191349-539144e4-b942-41da-a79f-2cdd2212c4f5.png)
 
 A partir de esto:
 - El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en el Managed Instance Group, que en este caso es del 180% (60% por cada instancia)
@@ -654,13 +654,18 @@ Esto lo atribuimos a:
 
 Ahora miremos el consumo de recursos converter:
 
-> *obtenida con con el dashboard de GCP
-![image](https://user-images.githubusercontent.com/98927955/201498871-7fe32012-cc91-4ea2-b891-ce8bb4f29461.png)
+> *obtenida con el monitoring del Managed Instance Group de GCP
+![image](https://user-images.githubusercontent.com/98927955/203191656-6ac4008e-f1c6-4c1d-84dd-d7c40c3ed4fc.png)
 
-- Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 7 archivos en el primer minuto, un poco más del doble del promedio.
+Ahora relacionemos el comportamiento de encolamiento de mensajes vs el procesamiento en converter
+
+> *obtenida con el dashboard configurado explícitamente en monitoring de GCP
+![image](https://user-images.githubusercontent.com/98927955/203193352-342f047a-b64a-436e-839c-1a87faff5b52.png)
+
+- Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 10 archivos en el primer minuto, un poco más del triple del promedio.
 - Esta es una actividad completamente bottlenecked por la CPU por lo cual vemos que no la deja descansar en ningún momento.
-- El hecho de que siempre está saturada la CPU confirma que el solo utilizar 1 worker es la decisión correcta, al ser también un proceso 100% síncrono.
-
+- El hecho de que siempre está saturada la CPU confirma que el solo utilizar 1 worker es la decisión correcta, al ser también un proceso 100% síncrono
+- Por parte del PUB/SUB se observa una carga rápida de los 200 mensajes encolados, y un desencolamiento controlado por parte de los 3 workers que se cargaron con auto-scaling
 
 #### Instrucciones
 
