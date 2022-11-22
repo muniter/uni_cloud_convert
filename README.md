@@ -383,7 +383,7 @@ sudo docker exec -it <<container_name>> bash
 # Análisis de Capacidad
 
 
-Nota: **Se hace comparativo en cada punto con [la entrega de la primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1) y [la entrega de la segunda semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-2).**
+Nota: **Se hace comparativo en cada punto con entrega de la [primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1), [segunda semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-2) y [tercera semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-3).**
 
 Se realizan pruebas de carga y estrés a la aplicación para lograr dimensionar la capacidad de la misma en un entorno de infraestructura definido. A continuación se describen las pruebas realizadas, los análisis de los resultados y las conclusiones sobre el rendimiento de la aplicación
 
