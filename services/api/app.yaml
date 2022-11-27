@@ -20,3 +20,7 @@ runtime_config:
     python_version: 3.7
 manual_scaling:
     instances: 1
+liveness_check:
+  path: "/health-check"
+readiness_check:
+  path: "/health-check"
