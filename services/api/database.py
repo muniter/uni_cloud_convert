@@ -5,10 +5,10 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 
 # Important: https://towardsdatascience.com/use-flask-and-sqlalchemy-not-flask-sqlalchemy-5a64fafe22a4
 
-USER = os.environ.get("POSTGRES_USER")
-PASSWORD = os.environ.get("POSTGRES_PASSWORD")
-HOST = os.environ.get("POSTGRES_HOST")
-DATABASE = os.environ.get("POSTGRES_DB")
+USER = "cloud"#os.environ.get("POSTGRES_USER")
+PASSWORD = "cloud"#os.environ.get("POSTGRES_PASSWORD")
+HOST = "172.27.224.3"#os.environ.get("POSTGRES_HOST")
+DATABASE = "cloud_conversion"#os.environ.get("POSTGRES_DB")
 
 if not all([USER, PASSWORD, HOST, DATABASE]):
     raise ValueError(
