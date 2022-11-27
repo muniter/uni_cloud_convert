@@ -15,7 +15,7 @@
 service: api-app
 runtime: python
 env: flex
-entrypoint: gunicorn -b :$5000 app:create_app()
+entrypoint: gunicorn -b :8080 app:create_app()
 runtime_config:
     python_version: 3.7
 manual_scaling:

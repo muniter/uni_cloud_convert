@@ -34,7 +34,7 @@ def init():
 
     app.logger.info("Got the first request, checking if the database is initialized")
     # Check if the table tasks exists, if not, initialize the database
-    try:
+    '''try:
         db_session.execute("SELECT 1 FROM tasks LIMIT 1")
         app.logger.info("Database is already initialized")
     except Exception:
@@ -42,7 +42,7 @@ def init():
         app.logger.info("Database not initialized, initializing")
         init_db()
         app.logger.info("Database initialized")
-
+'''
 
 def get_pub_client():
     from cloud import get_publish_client
@@ -67,7 +67,7 @@ def send():
 
 @app.get("/api-health")
 def health():
-    db_session.execute("SELECT 1")
+    #db_session.execute("SELECT 1")
     return {"database": "OK"}, 200
 
 
