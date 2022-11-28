@@ -5,9 +5,9 @@ from google.cloud import storage, pubsub_v1
 import os
 from app import app
 
-GCP_BUCKET_NAME = "miso-rad-cloud-convert"#os.environ.get("GCP_BUCKET_NAME", None)
-GCP_PROJECT_ID = "CloudConverter-gr3"#os.environ.get("GCP_PROJECT_ID", None)
-GCP_CONVERTER_TOPIC = "projects/CloudConverter-gr3/topics/converter"#os.environ.get("GCP_CONVERTER_TOPIC", None)
+GCP_BUCKET_NAME = os.environ.get("GCP_BUCKET_NAME", None)
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", None)
+GCP_CONVERTER_TOPIC = os.environ.get("GCP_CONVERTER_TOPIC", None)
 
 # Validation
 if GCP_BUCKET_NAME is None:
