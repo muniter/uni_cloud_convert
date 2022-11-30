@@ -1,0 +1,19 @@
+service: converter-app
+runtime: custom
+env: flex
+entrypoint: python app.py
+manual_scaling:
+    instances: 1
+liveness_check:
+  path: "/ping"
+readiness_check:
+  path: "/ping"
+env_variables:
+  POSTGRES_HOST: 35.232.151.216
+  POSTGRES_USER: cloud
+  POSTGRES_DB: cloud_conversion
+  POSTGRES_PASSWORD: cloud
+  GCP_BUCKET_NAME: miso-rad-cloud-convert
+  GCP_PROJECT_ID: CloudConverter-gr3
+  GCP_CONVERTER_TOPIC: projects/CloudConverter-gr3/topics/converter
+  GCP_CONVERTER_SUBSCRIPTION: projects/CloudConverter-gr3/subscriptions/converter
