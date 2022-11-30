@@ -39,35 +39,19 @@ flowchart TD
   subgraph MAIL
     mail[Sendgrid]
   end
-  web<--http-->LB
+  web<--http-->MIG
   subgraph GCP
-    subgraph LB
-      bal[Load Balancer]
-    end
-    LB <--> MIG
-    subgraph MIG[Managed Instance Group]
+    subgraph MIG[API Google App Engine]
       direction BT
       api1[API instance 1 - CE]
-      api2[API instance 2 - CE]
-      apin[API instance 3 - CE]
-      tem[api-instance-template - TMP \n f1-micro]
-      tem-.->api1
-      tem-.->api2
-      tem-.->apin
     end
     PUBSUB[PSU Google Cloud Pub/Sub]
     subgraph SQL
       db[Database \n PostgreSQL]
     end
-    subgraph MIGC[Managed Instance Group]
+    subgraph MIGC[Converter Google App Engine]
       direction BT
       co1[Converter instance 1 - CE]
-      co2[Converter instance 2 - CE]
-      con[Converter instance 3 - CE]
-      ctem[converter-instance-template - TMP \n f1-micro]
-      ctem-.->co1
-      ctem-.->co2
-      ctem-.->con
     end
     subgraph GCS
       gcs[bucket - GCS]
