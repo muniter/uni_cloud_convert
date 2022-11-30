@@ -1,6 +1,8 @@
 FROM python:3.9-buster
 WORKDIR /usr/src/app
 COPY requirements.txt ./
+
+COPY ./ ./
 # Postgres client dependencies
 RUN apt-get update && apt-get install -y \
     libpq-dev \

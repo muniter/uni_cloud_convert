@@ -71,6 +71,11 @@ def health():
     return {"database": "OK"}, 200
 
 
+@app.get("/alive")
+def alive():
+    return {"message": "I'm alive!"}
+
+
 @app.get("/converter-health")
 def convert_health():
     client, topic = get_pub_client()
