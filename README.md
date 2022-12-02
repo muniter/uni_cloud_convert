@@ -443,7 +443,7 @@ Cuadro comparativo:
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
 > *obtenida con Logging filtrado para App Engine - api-app
-TODO - incluir imagen
+![image](https://user-images.githubusercontent.com/98927955/205398589-6d957932-ab6a-450b-82f5-2303e7f22b28.png)
 
 A partir de esto:
 - El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en App Engine
@@ -516,11 +516,11 @@ Esto lo atribuimos a:
 
 Ahora miremos el consumo de recursos converter:
 > *obtenida con Logging de App Engine - converter-app
-TODO: incluir imagen
+![image](https://user-images.githubusercontent.com/98927955/205398656-9eb14a39-4793-4749-9ad0-24195b6a3efd.png)
 
 y la distribución de carga de mensajes al Pub/sub:
 > *obtenida con Monitoring
-TODO: incluir imagen
+![image](https://user-images.githubusercontent.com/98927955/205398751-fff92252-f5d6-453f-808e-b9437710eb55.png)
 
 - En este caso, en comparación con las anteriores entregas, el boost inicial fue alto, sin embargo se mantuvo, y tuvo algunas variaciones hacia arriba y abajo en los primeros 5 minutos, luego se estabilizó en un valor que aún era alto
 - Esta es una actividad completamente bottlenecked por la CPU por lo cual vemos que no la deja descansar en ningún momento.
