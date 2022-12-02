@@ -13,11 +13,11 @@ Aplicación que convierte archivos entre los siguientes formatos de audio: MP3, 
 
 Desarrollar un servicio de conversión entre diferentes formatos de audio y poner a prueba su rendimiento y capacidad bajo unas características de infraestructura local definidas
 
-* alcance semana 3: escalabilidad en la capa web
+* alcance entrega 5: despliegue en PaaS - Google App Engine
 
 ## Arquitectura
 
-Versión: **máquinas virtuales en GCP + escalabilidad en capa web**
+Versión: **app desplegada en plataforma PaaS - Google App Engine**
 
 La siguiente es la arquitectura de la aplicación
 
@@ -26,8 +26,7 @@ Convención del diagrama:
 **CE**: Google Cloud Compute engine  
 **SQL**: Google Cloud SQL  
 **LB**: Load Balancer  
-**MIG**: Managed Instance Group  
-**TMP**: Instance Template  
+**MIG**: Google App Engine  
 **PSU**: Google Cloud Pub/Sub  
 **GCS**: Google Cloud Storage  
 
@@ -73,9 +72,7 @@ A nivel de infraestructura
 | Componente        | Propósito                                                                 |
 |-------------------|---------------------------------------------------------------------------|
 | Client            | Consume el servicio de conversión.                                        |
-| Load Balancer     | A través de una sola dirección ip, distribuye las peticiones hacia el API |
-| Manage Instance Group    | Gestiona las instancias de tanto de la API y del converter                     |
-| Instance Template | Plantilla de instancias de APIs                                           |
+| Google App Engine | Habilita el environment, expone un dns de consumo, administra internamente temas como el balanceo de carga, las instancias de despliegue y el escalamiento (de acuerdo a la configuración establecida) |
 | API               | Autentica, y despacha los servicios.                                      |
 | Cloud Pub/Sub     | Servició de mensajería, por donde se despachan solicitudes de conversión  |
 | Converter         | Recibe solicitudes de conversión                                          |
@@ -87,7 +84,7 @@ A nivel de infraestructura
 
 ### Tecnológica
 
-Se utiliza docker para orquestar el levantamiento de los componentes API y Converter
+Se utiliza docker para orquestar el levantamiento del componente Converter
 
 #### Tecnologías
 
@@ -97,20 +94,18 @@ Se utiliza docker para orquestar el levantamiento de los componentes API y Conve
 4. SqlAlchemy: ORM para la comunicación.
 5. uvicorn: HTTP <-> ASGI bridge para la comunicación del Flask.
 6. ffmpeg: convertidor de formatos de audio.
-7. Google Cloud storage: Almaacenamiento de archivos.
+7. Google Cloud storage: Almacenamiento de archivos.
 8. Load Balancer: balanceador de carga de peticiones HTTP.
-9. Managed Instance Group: orquestador de instancias de computo.
-10. Instance Template: plantilla de instancias de computo.
+9. Google App Engine: entorno administrado tipo PaaS para el despliegue de aplicaciones
 
 #### Servicios de Google Cloud Platform utilizados
 
-1. Load Balancer
-2. Managed Instance Group
-3. Compute Engine
-4. SQL
-5. Cloud Storage
-6. Monitoring
-7. Pub/Sub
+1. Google App Engine
+2. Compute Engine
+3. SQL
+4. Cloud Storage
+5. Monitoring
+6. Pub/Sub
 
 ### Ejemplo de conversión
 
@@ -162,13 +157,8 @@ Información adicional en documentación del API en Postman en el siguiente link
 
 Requerimientos:
   - Infraestructura:
-    - 1 balanceador de carga con protocolo http habilitado y funcionando en dos availability zone
-    - 1 imagen de disco pre-configurado con base a api
-    - 1 plantilla de instancia configurada con la imagen de disco api
-    - 1 grupo de instancias administradas con base a la plantilla de instancia de api
-    - 1 imagen de disco pre-configurado con base a converter
-    - 1 plantilla de instancia configurada con la imagen de disco converter
-    - 1 grupo de instancias administradas con base a la plantilla de instancia de converter
+    - 1 servicio de App Engine tipo estandar para despliegue de API
+    - 1 servicio de App Engine tipo flex para despliegue de Converter
     - 1 Instancia de cloud sql de desarrollo con Postgres 14
     - 1 topic de pub/sub
     - 1 subscription de pub/sub
@@ -178,34 +168,20 @@ Requerimientos:
     - Docker
     - Python
 
-### Instrucciones comunes
+### instrucciones de despliegue en App Engine estandar
 
-Los siguientes pasos son iguales para todas las máquinas a instalar, **se suponen lo siguiente**:
-
-- Se escogió el tipo correcto de instancia
-- **Las instancias comparten la misma red privada**
-- El grupo de instancias api administrado debe llamarse: api-group
-- Las instancias tienen habilitado tráfico http (configuración al crearlas)
-- El grupo de instancias converter administrado debe llamarse: converter-group
-- Su usuario es `maestria`, y su home directory es `/home/maestria`
-- Tiene acceso a root
-
-1. Instalar dependencias:
+- crear proyecto en App Engine
 
 ```bash
-sudo apt update && sudo apt install git docker docker-compose
+cd uni_cloud_convert/services/[api/converter] 
+gcloud auth application-default login
+gcloud app create
 ```
-
-2. Clonar el repositorio
-
+- configurar app yaml
+- desplegar app y verificar su despliegue
 ```bash
-git clone https://github.com/muniter/uni_cloud_convert.git
-```
-
-3. Entrar a la carpeta
-
-```bash
-cd uni_cloud_convert
+gcloud app deploy
+gcloud app browse
 ```
 
 #### Bucket en Cloud Storage
@@ -237,91 +213,6 @@ Puede seguir las [siguientes instrucciones](https://cloud.google.com/sql/docs/po
 
 Si tiene algún problema en la configuración de Private IP pude seguir el [siguiente instructivo](https://cloud.google.com/sql/docs/postgres/configure-private-ip)
 
-#### Instancias API dentro de un Managed Instance Group
-
-Crear una instancia de Compute Engine N1 f1-micro para configurar el API, luego se puede desactivar/eliminar
-
-1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
-
-2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-```
-
-3. Estando en la base del repositorio moverse a la carpeta [services/api](./services/api) y correr el script de startup.
-```bash
-cd /home/maestria/uni_cloud_convert/services/api
-sudo ./startup.py
-```
-4. A partir de la máquina de API preparada, generar una imagen de disco llamada **api-disk-image**
-
-5. Crear una plantilla de instancias llamada **api-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
-
-6. Configurar startup-script
-
-```bash
-cd /home/maestria/uni_cloud_convert/services/converter
-sudo git pull
-sudo docker compose up -d
-```
-
-7. Crear un grupo de instancias administradas con nombre **api-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
-  
-  * Ubicación: Varias zonas (Elegir dos zonas dentro de la misma región)
-  * Autoscaling: on
-  * Mínimo: 1 instancia
-  * Máximo: 3 instancias
-  * Métrica de autoscaling: CPU > 60%
-
-#### Load Balancer
-
-1. Configurar balanceador de carga con nombre **web-map-http** direccionado el servicio de backend al grupo de instancias administradas **api-group** [ver paso a paso](https://cloud.google.com/iap/docs/load-balancer-howto?hl=es-419), **desplegar en 2 zonas de disponibilidad**.
-2. Configurar un health check llamado **http-basic-check** con las siguientes características
-  * Path: /api-health
-  * Protocol: HTTP
-  * Port: 80
-  * Interval: 10 segs
-  * Timeout: 10 segs
-  * Healthy threshold (instancia saludable): 2 peticiones satisfactorias consecutivas
-  * Unhealthy threshold (instancia no saludable): 2 peticiones fallidas consecutivas
-
-#### Instancias de Converter dentro de un Manage Instance Group
-
-Crear una instancia de Compute Engine N1 f1-micro para configurar el converter, luego se puede desactivar/eliminar
-
-1. Ya teniendo configurada la base de datos, tomar nota de la IP Privada de esta y las credenciales que utilizó y colocarlas en las variables de entorno del [.env](./.env) `POSTGRES_HOST, POSTGRES_USER, POSTGRES_DB, POSTGRES_PASSWORD`
-
-2. Copiar localmente el archivo **service-account.json** generado en la configuración del bucket en Cloud Storage, el cual ya se encuentra configurado en las variables de entorno [.env](./.env)
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-```
-
-3. Estando en la base del repositorio moverse a la carpeta [services/converter](./services/converter) y correr el script de startup.
-```bash
-cd /home/maestria/uni_cloud_convert/services/converter
-sudo ./startup.py
-```
-4. A partir de la máquina de API preparada, generar una imagen de disco llamada **converter-disk-image**
-
-5. Crear una plantilla de instancias llamada **converter-instance-template-storage** seleccionando la imagen de disco creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-templates/create-instance-templates#gcloud_1)
-
-6. Configurar startup-script
-
-```bash
-cd /home/maestria/uni_cloud_convert/services/converter
-sudo git pull
-sudo docker compose up -d
-```
-
-7. Crear un grupo de instancias administradas con nombre **converter-group** seleccionando la plantilla de instancias creada en el paso anterior [ver paso a paso](https://cloud.google.com/compute/docs/instance-groups/create-mig-with-basic-autoscaling), con las siguientes configuraciones: 
-   
-  * Ubicación: Varias zonas (Elegir dos zonas dentro de la misma región)
-  * Autoscaling: on
-  * Mínimo: 1 instancia
-  * Máximo: 3 instancias
-  * Forma de distribución objetivo:  Uniforme
-  * Métrica de autoscaling: 3 mensajes en la cola de mensajes.
-
 ### Health Checks
 
 Con estas instrucciones están listo el despliegue, se puede continuar haciendo health checks.
@@ -330,16 +221,16 @@ Para confirmar el funcionamiento de las partes de la app:
 
 ```bash
 # Cliente Web (En el response se verá el resultado)
-curl $API_PUBLIC_IP/api-health
+curl $API_PUBLIC_URL/api-health
 # Converter (Revisar los logs para ver el resultado)
-curl $API_PUBLIC_IP/converter-health
+curl $API_PUBLIC_URL/converter-health
 # Ping, pong style (mirar los logs)
-curl $API_PUBLIC_IP/ping
+curl $API_PUBLIC_URL/ping
 ```
 
 ### Probar el uso del servicio
 1. Instalar Postman localmente
-2. Configurar un environment con la IP pública asignada al Load Balancer
+2. Configurar un environment con la $API_PUBLIC_URL pública asignada al Load Balancer
 3. Configurar los endpoints vistos previamente
 4. Deshabilitar variable de entorno `STRESS_TEST` en la máquina converter.
     **NOTA: Antes de correr cualquier prueba no olvide habilitar el envío de correos, editando en el archivo [.env](./.env):**
@@ -361,13 +252,21 @@ sudo docker container ls
 sudo docker exec -it <<container_name>> bash
 ```
 
+### Logs desde App Engine
+
+- Ir a la consola de GCP
+- Ingresar al servicio de App Engine
+- Identificar el servicio API/Converter requerido
+- En la columna _Diagnose_ desplegar las opciones de _TOOLS_ y seleccionar _Logs_
+- Se tendrá la salida de logs generados por la aplicación
+
 <div style="page-break-after: always; visibility: hidden"> 
 </div>
 
 # Análisis de Capacidad
 
 
-Nota: **Se hace comparativo en cada punto con entrega de la [primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1), [segunda semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-2) y [tercera semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-3).**
+Nota: **Se hace comparativo en cada punto con entrega de la [primera semana](https://github.com/muniter/uni_cloud_convert/tree/release-1), [segunda semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-2), [tercera semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-3) y [cuarta semana](https://github.com/muniter/uni_cloud_convert/releases/tag/release-4).**
 
 Se realizan pruebas de carga y estrés a la aplicación para lograr dimensionar la capacidad de la misma en un entorno de infraestructura definido. A continuación se describen las pruebas realizadas, los análisis de los resultados y las conclusiones sobre el rendimiento de la aplicación
 
@@ -430,39 +329,27 @@ STRESS_TEST=1
 
 ## Preámbulo
 
-### Hallazgos en ejecución en máquinas virtuales, escalamiento tanto en la capa web como en el worker
+### Hallazgos en ejecución en App Engine, tanto en capa web como en worker
 
-- Incremento en nivel de complejidad: En el entorno de una sola máquina era solo usar un comando para levantar todo, ahora es necesario orquestar múltiples cosas.
-- La aplicación opera de forma satisfactoria con los diferentes servicios corriendo en su propia máquina.
-- El escalamiento horizontal de instancias **API** es un mecanismo eficiente para incrementar/reducir la capacidad de acuerdo a la carga eventual de peticiones
-- La sincronización entre el balanceador de carga y las instancias generadas por el Managed Instance Group es natural y eficiente.
-- El escalamiento horizontal del converter si bien se podría hacer en base del uso del CPU de las instancias, la métrrica recomendada a usar es el número de mensajes en cola.
-- El Cloud Pub/Sub viene configurado por defecto con la operación de push y de acuerdo a las necesidades de este proyecto se requirió hacer cambios en el converter para hacer pull de los mensajes.
+- La configuración de API fue natural ya que el desarrollo estaba realizado para funcionar en docker, de tal manera que al paso a App Engine no implicó cambios profundos al desarrollo
+- La configuración del Converter si tuvo un impacto profundo en su funcionamiento, ya que no estaba pensado para funcionar bajo peticiones http, sin embargo, App Engine requiere la exposición de un servicio http para validar su disponibilidad
+- Con la restricción de no configurar auto-scaling, el desempeño del API fue reducido, mientras que el del Converter fue muy satisfactorio para una sola instancia
+- La comunicación de App Engine con otros servicios de GCP previamente configurados no implicó mayores cambios (ej: Pub/Sub, Cloud Storage), sin embargo, en SQL si se requirió configuraciones adicionales para habilitar la conexión
 
 #### Procesamiento CPU (frente a la entrega anterior)
 
-- Se necesitó pasar de usar RabbitMQ y Celery a un servicio de mensajería provisto por Google, llamando Cloud Pub/Sub
-- Generación variable de instancias de máquinas virtuales de API y de converter con 1vCPU c/u
-  - a través del Managed Instance Group se crean de una a tres instancias de API y del worker de acuerdo a la carga eventual y al número de mensajes encolados en el caso del worker, por lo cual la capacidad de procesamiento es dinámica dentro del rango
-- Database en Cloud SQL
-  - database: mantuvo sus características
-- Se mantiene el uso de Cloud Storage estándar
-  - El acceso al servicio de Cloud Storage requiere un mecanismo más complejo de autenticación a través de un service-account, respecto a otras tecnologías como NFS usadas en las primeras entregas
-  - La gestión de archivos con el bucket se realiza ya no como un directorio si no como servicio, generando requests get, put, delete. Este cambio traslada la gestión de la transferencia del archivo del sistema operativo a la aplicación a través de la librería storage de google.cloud en Python. Este cambio genera mayor consumo de CPU por request 
-- Componentes:
-  - Los componentes requirieron una modificación no extensa pero si a tomar en cuenta para la integración del nuevo servicio de mensajería.
+- La configuración de CPU ya no es explícita, es administrada por App Engine
+- Database en Cloud SQL: mantuvo sus características
+- Cloud Storage estándar: mantuvo sus características
+- Pub/Sub: mantuvo sus características
 
 #### Memoria
 
-- 2.4Gb de memoria distribuido.
-  - Esta cantidad de memoria es suficiente para el uso de la aplicación, no presentó problemas.
-  - Debido a que el converter está invocando un programa escrito eficiente `ffmpeg` escrito en C, la capacidad de memoria es suficiente.
+- La configuración de memoria ya no es explícita, es administrada por App Engine
 
 #### Almacenamiento
 
-- Mantuvimos la capacidad de 40Gb
-- La imagen de Debian instalada en las máquinas estaba muy optimizada a ocupar poco espacio menos de 2Gb
-  - Por lo cual los 8Gb de espacio restante por máquina fueron suficientes.
+- La configuración de almacenamiento ya no es explícita, es administrada por App Engine
 - La introducción de Cloud Storage **introdujo mayor latencia en la transferencia de red**.
 
 ## Escenarios del Plan de pruebas
@@ -523,7 +410,7 @@ cd /home/maestria
 
 ```bash
 # NOTA: reemplazar por la ip asignada al balanceador de carga
-locust --host=http://<IP_LOAD_BALANCER> --users=400 --spawn-rate=2 --web-port --autostart
+locust --host=http://<API_URL> --users=400 --spawn-rate=2 --web-port --autostart
 ```
 
 3. Navegar a `http://IP_DE_MAQUINA_VIRTUAL_TEST` para ver la interfaz de locust podrá ver tab de **estadísticas, gráficas e instrucciones**.
@@ -534,6 +421,7 @@ locust --host=http://<IP_LOAD_BALANCER> --users=400 --spawn-rate=2 --web-port --
 
 Se relacionan las diferentes entregas para detalle de la comparación realizada
 
+* App Engine: [Entrega 5][@res-scenario-1-5]
 * GCP Autoscaling Converter + Cloud Pub/Sub: [Entrega 4][@res-scenario-1-4]
 * GCP Autoscaling API: [Entrega 3][@res-scenario-1-3]
 * GCP PaaS: [Entrega 2][@res-scenario-1-2]
@@ -541,39 +429,26 @@ Se relacionan las diferentes entregas para detalle de la comparación realizada
 
 Estos son los puntos principales:
 
-- El aplicativo es capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 40 usuarios concurrentes aproximadamente, atendiendo a 3.7 request/segundo, esto es un incremento comparado al despliegue de la entrega anterior donde el aplicativo era capaz de mantener un tiempo de respuesta menor a 1.5 segundos con 35 usuarios concurrentes aproximadamente, atendiendo a 2.6 request/segundo
-
-- El aplicativo es capaz de atender 222 request/minuto con archivos para conversión.
-  
-- La curva de tiempo de respuesta alcanza rápidamente tiempos altos de respuesta desde los 24 usuarios concurrentes y empieza a generar timeouts (requests con más de 10 segundos de espera) con 114 usuarios concurrentes
-- Con el autoescalamiento se observa que detiene y reduce levemente la curva de fallas por timeout, sin embargo, no es suficiente para atender la carga concurrente, por lo cual rápidamente vuelve a tener una tendencia creciente, un comportamiento que se evidenció en el despliegue anterior
-- Se observa que la velocidad que tardan las instancias del api en estar listas para atender peticiones no logra ser lo suficientemente rápida para lograr evitar timeouts. Cuando ya están arriba logran distribuir la carga y atender las nuevas peticiones, sin embargo rápidamente se ocupa su capacidad, generando nuevamente timeouts
-- El máximo de 3 instancias del grupo worker y API configuradas sumadas a un nuevo servicio de mensajer'ia no son suficientes para atender la carga configurada en este escenario, sin embargo se nota una mejora respecto al anterior despliegue.
+- La instancia de App Engine de entrada inicia con tiempos de respuesta superiores a los 1.500 ms, por lo cual una sola instancia de App Engine Estandar no cumple los requisitos establecidos
+- Los timeout por request superiores a 10 segundos empiezan a ocurrir con 20 usuarios
 
 Cuadro comparativo:
 
-| Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
-|----------------------------------------------------------|----------------|--------------|---------------------------------|------------------------------------|
-| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   | 3.7/s, 222/min                     |
-| Usuarios (<1500ms)                                       | 70             | 56           | 35                              | 44                                 |
-| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              | 114                                |
+| Datos \ Ambiente                                         | Local          | GCP PaaS     | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub | App Engine (1 instancia) |
+|----------------------------------------------------------|----------------|--------------|--------------------------------|------------------------------------|---------------------|
+| RPS (<1500ms)                                            | 7.4/s, 440/min | 6/s, 360/min | 2.6s, 156/min                   | 3.7/s, 222/min                     | 0/s, 0/min |
+| Usuarios (<1500ms)                                       | 70             | 56           | 35                              | 44                                 | 0          |
+| Peticiones concurrentes que generan Timeouts (> 10 segs) | 170            | 146          | 70                              | 114                                | 20         |
 
 Durante la operación el punto crítico era la utilización de recursos de las instancias del API que atendían las peticiones:
 
-> *obtenida con el monitoring del Managed Instance Group de GCP
-![image](https://user-images.githubusercontent.com/98927955/203191201-9179c6bc-208c-43bd-9f36-11ddf0de415a.png)
-
-> *obtenida con el dashboard configurado explícitamente en monitoring de GCP
-![image](https://user-images.githubusercontent.com/98927955/203191349-539144e4-b942-41da-a79f-2cdd2212c4f5.png)
+> *obtenida con Logging filtrado para App Engine - api-app
+TODO - incluir imagen
 
 A partir de esto:
-- El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en el Managed Instance Group, que en este caso es del 180% (60% por cada instancia)
-- El parámetro de 60% por instancia se configuró para dar un periodo de creación de instancias cuando la primera instancia alcanza este umbral, ya que el tiempo de creación puede tardar hasta 60 segundos, sin embargo al reducirlo, reduce la capacidad esperada de las 3 instancias
-- La inclusión de Cloud Storage generó un mayor consumo de CPU para la autenticación y el envío de archivos a través del API de Cloud Storage. Al no cambiar las capacidades del API, redujo su desempeño por instancia
-- Durante un periodo de tiempo está usando más CPU de la que es asignada (esta es una propiedad de la máquina F1 asignada), el incremento y posterior estabilización de cantidad de CPU disponible lo vemos marcadamente con los incrementos en tiempo de respuesta.
-- El **API** esta **restringida** por recursos CPU asignados a cada instancia en particular y al máximo de instancias permitidas (max=3)
-
-
+- El API se encuentra principalmente restringido por la capacidad de procesamiento (CPU) que es capaz de alcancar con el máximo de instancias permitidas en App Engine
+- Se requiere plantear una validación del funcionamiento del API a nivel de App Engine para identificar si los tiempos de respuesta superiores a 1.500 ms pueden reducirse con optimizaciones de código, o si por el contrario se debe replantear el despliegue de estándar a flexible
+- El **API** esta **restringida** por recursos CPU asignados a cada instancia en particular y al máximo de instancias permitidas (max=1)
 
 ### 2. Capacidad de conversiones
 
@@ -617,6 +492,7 @@ sequenceDiagram
 #### Resultados
 Se relacionan las diferentes entregas para detalle de la comparación realizada
 
+* App Engine: [Entrega 5][@res-scenario-2-5]
 * GCP Autoscaling Converter + Cloud Pub/Sub: [Entrega 4][@res-scenario-2-4]
 * GCP Autoscaling API: [Entrega 3][@res-scenario-2-3]
 * GCP PaaS: [Entrega 2][@res-scenario-2-2]
@@ -624,34 +500,32 @@ Se relacionan las diferentes entregas para detalle de la comparación realizada
 
 En esta prueba vimos un comportamiento similar al obtenido con GCP Autoscaling API, sin embargo, la cantidad de trabajos lanzados al mismo tiempo si tuvo un incremento. Comparando métricas:
 
-| Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub |
-|------------------------------------------------------------|----------------------|------------------|---------------------------------|-------------------|
-| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                               | 8                 |
-| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7                               | 10                |
-| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             | 7-8               |
-| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60                              | 50                |
-| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28                              | 81                |
-| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos                | 200 en 26 minutos |
+| Datos \ Ambiente                                           | Local                | GCP PaaS         | Autoscaling web + Cloud Storage | Autoscaling worker + Cloud Pub/Sub | App Engine        |
+|------------------------------------------------------------|----------------------|------------------|---------------------------------|------------------------------------|-------------------|
+| Promedio de archivos procesados por minuto                 | 18                   | 3                | 3                               | 8                                  | 11                |  
+| Máximo de archivos procesados por minuto                   | 20                   | 7                | 7                               | 10                                 | 13                |
+| Valor más frecuente de archivos procesados por minuto      | 20                   | 2-3              | 2-3                             | 7-8                                | 11                |
+| Concurrencia soportada (peticiones simultáneas)            | 400                  | 200              | 60                              | 50                                 | 50                |
+| Peticiones atendidas en menos de 10 minutos                | 193                  | 28               | 28                              | 81                                 | 111               |
+| Tiempo de conversión para la concurrencia enviada          | 400 en 20 minutos    | 82 en 33 minutos | 60 en 24 minutos                | 200 en 26 minutos                  | 225 en 20 minutos |
 
 Esto lo atribuimos a:
-- Los cambios a nivel de capacidades del componente converter, lograron casi triplicar la capacidad de conversión
-- La lectura de archivos desde el Cloud Storage no afectó el tiempo de procesamiento de cada tarea
+- El performance de App Engine en configuración flexible, el cual con una sola instancia superó el rendimiento que se había logrado con 3 instancias en autoscaling
+- Posiblemente el factor fundamental es el tipo de máquina usada por App Engine que es transparente para el usuario y no se configura explícitamente
 - Sin embargo, los aspectos de CPU y Cloud Storage mencionados en el escenario 1, afectaron la capacidad de lanzar gran cantidad de peticiones al mismo tiempo, en este caso se ejecutó dentro de un loop estas peticiones
 
 Ahora miremos el consumo de recursos converter:
+> *obtenida con Logging de App Engine - converter-app
+TODO: incluir imagen
 
-> *obtenida con el monitoring del Managed Instance Group de GCP
-![image](https://user-images.githubusercontent.com/98927955/203191656-6ac4008e-f1c6-4c1d-84dd-d7c40c3ed4fc.png)
+y la distribución de carga de mensajes al Pub/sub:
+> *obtenida con Monitoring
+TODO: incluir imagen
 
-Ahora relacionemos el comportamiento de encolamiento de mensajes vs el procesamiento en converter
-
-> *obtenida con el dashboard configurado explícitamente en monitoring de GCP
-![image](https://user-images.githubusercontent.com/98927955/203193352-342f047a-b64a-436e-839c-1a87faff5b52.png)
-
-- Vemos primeramente el gran boost que tenemos al principio, por la característica de máquina, y vemos como esto se presenta en la gráfica de resultados al ser el aplicativo capaz de convertir 10 archivos en el primer minuto, un poco más del triple del promedio.
+- En este caso, en comparación con las anteriores entregas, el boost inicial fue alto, sin embargo se mantuvo, y tuvo algunas variaciones hacia arriba y abajo en los primeros 5 minutos, luego se estabilizó en un valor que aún era alto
 - Esta es una actividad completamente bottlenecked por la CPU por lo cual vemos que no la deja descansar en ningún momento.
 - El hecho de que siempre está saturada la CPU confirma que el solo utilizar 1 worker es la decisión correcta, al ser también un proceso 100% síncrono
-- Por parte del PUB/SUB se observa una carga rápida de los 200 mensajes encolados, y un desencolamiento controlado por parte de los 3 workers que se cargaron con auto-scaling
+- Por parte del PUB/SUB se observa una carga rápida de los 200 mensajes encolados, y un desencolamiento controlado por parte del worker de app-engine
 
 #### Instrucciones
 
@@ -662,7 +536,7 @@ Debe haber seguido antes todas las [instrucciones de despliegue](#instrucciones-
 
 ```bash
 cd /home/maestria/
-for var in {1..4}; do curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=50 http://<IP_BALANCEADOR_CARGA>/benchmark/conversion/start; sleep 30; done
+for var in {1..4}; do curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumber=50 http://<API_URL>/benchmark/conversion/start; sleep 30; done
 ```
 
 ---
@@ -671,12 +545,12 @@ for var in {1..4}; do curl -F fileName=@sample.mp3 -F newFormat=wav -F taskNumbe
 3. Copiar localmente la carpeta **reporte** del repositorio, modificar la primera línea del archivo **report.js**
 
 ```bash
-http://$IP_DEL_BALANCEADOR/benchmark/conversion/data
+http://$API_URL/benchmark/conversion/data
 ```
 
-4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se completen las 60 peticiones
+4. Ejecutar index.html y monitorear durante 10 minutos para poder observar cuantas tareas se pudieron completar, y posteriormente para identificar cuando se complete el total de peticiones
 
-Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
+Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-4]
 
 
 ### Conclusiones y Limitaciones
@@ -686,14 +560,13 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
 - Python y sus utilidades de transformación nos son ideales para actividades que están fuertemente restringidas por el uso de recursos (conversión de archivos).
 - La aplicación tiene como principal bottleneck la CPU para el converter y las instancias de la api.
 - Mantener Cloud Storage como servicio produce mayor latencia para escribir el archivo por parte del api, y no tanto impacto al obtenerlo del lado del convertidor.
-- El uso de git y docker optimiza el proceso de desarrollo colaborativo, simplifica el proceso de despliegue en la máquina virtual y estandariza el despliegue en pro de un comportamiento similar en diferentes máquinas virtuales 
+- El uso de App Engine reduce las preocupaciones respecto a la infraestructura, sin embargo, no implica menos esfuerzo en desarrollo, ya que debe desarrollarse en pro de sacar el mejor provecho del funcionamiento PaaS
+- Las dos posibilidades de App Engine (estándar y flexible) tienen diferentes características y ventajas. En este caso, estándar fue adecuado para peticiones API, y flexible fue necesario para soportar el funcionamiento de librerías como ffmpeg
 - Definir tamaños máximos de archivos y estimar la capacidad máxima esperada de peticiones de carga, de tal manera que se pueda estimar cual es la capacidad de almacenamiento límite a la que podría llegar el sistema
 - El uso de colas de mensajería permite desacoplar las dependencias de la respuesta del api frente al procesamiento de archivos, favoreciendo una mejor gestión y respuesta al usuario
 - Las limitaciones en la infraestructura donde opera el sistema, afecta directamente los tiempos de respuesta, la cantidad de transacciones concurrentes y la velocidad en que se completa un proceso de conversión
-- El escalamiento horizontal de la API a través de un Managed Instance Group efectivamente brinda una mayor o menor capacidad del componente API en momentos de alta o baja carga, confirmando así los beneficios del autoscaling en capacidad, rendimiento y costo. Sin embargo, esta estrategia debe ir acompañada de un análisis más profundo que permita identificar cual es el tiempo óptimo en el que una instancia debería iniciar y que es posible alcanzar, cual es el porcentaje de cpu que debería disparar el escalamiento, cuantas instancias máximas serían las apropiadas para soportar la máxima carga esperada, y ajustes de arquitectura y diseño de la aplicación que permitan sacar mejor provecho del autoscaling
-- El uso de balanceador de carga facilitó la implementación y uso de la aplicación aún teniendo varias instancias de API, ya que el consumidor del API es transparente cuantas o cual instancia atiende la petición. Adicionalmente, las configuraciones de verificación de estado de salud de una instancia permite ajustar el comportamiento esperado de acuerdo a las reglas de negocio de la aplicación
 - Cloud Storage brindó una alternativa de gestión de archivos y almacenamiento eficiente. El uso a través de servicios permite gestionar el bucket con esquemas robustos de seguridad, y desacoplado de los componentes de infraestructura en los que opera la aplicación. Sin embargo, el consumo de servicios y la gestión del ciclo de vida de la transferencia de cada archivo, generó mayor uso de cpu en las instancias del API, por lo cual su implementación debe ir acompañada de un análisis más profundo de arquitectura y diseño de la aplicación, de tal manera que se pueda sacar aún mejor provecho de Cloud Storage en aspectos como evitar la descarga de archivos a través del api si no con links directos a Cloud Storage de manera segura, o desacoplando la petición de conversión del almacenamiento en Cloud Storage, de tal manera que el api brinde respuestas rápidas al usuario, y gestione de manera más eficiente la transferencia de archivos al bucket
-- El escalamiento horizontal de la capa worker a través de un Manage Instance group ha incrementado evidentemente el número de archivos convertidos por el aplicativo.
+- App Engine es una alternativa muy favorable para el despliegue de aplicaciones. Es una alternativa a tener en cuenta en tiempo de diseño vs Compute Engine contemplando aspectos de adaptación tecnológica, impacto en el desarrollo, costo ante el escalamiento en cada caso, entre otros
 
 
 <!-- links, leave at the end, this should be invisible -->
@@ -705,7 +578,10 @@ Un ejemplo del reporte es el siguiente: [reporte][@res-scenario-2-3]
 [@res-scenario-1-2]: https://muniter.github.io/uni_cloud_convert/gcp_local_escenario_1
 [@res-scenario-1-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_1
 [@res-scenario-1-4]: https://muniter.github.io/uni_cloud_convert/Alta_disponibilidad_escenario_1.html
+[@res-scenario-1-5]: https://muniter.github.io/uni_cloud_convert/app_engine_escenario_1.html
 [@res-scenario-2-1]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/local_scenario_2.pdf
 [@res-scenario-2-2]: https://raw.githubusercontent.com/muniter/uni_cloud_convert/gh-pages/gcp_local_escenario_2.pdf
 [@res-scenario-2-3]: https://muniter.github.io/uni_cloud_convert/autoscaling_escenario_2.pdf
 [@res-scenario-2-4]: https://muniter.github.io/uni_cloud_convert/Alta_disponibilidad_escenario_2.pdf
+[@res-scenario-2-5]: https://muniter.github.io/uni_cloud_convert/app_engine_escenario_2.pdf
+
